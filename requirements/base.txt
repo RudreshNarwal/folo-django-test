@@ -1,0 +1,23 @@
+django==4.1.7
+django-environ==0.11.2 # configure env for django
+djangorestframework==3.14.0 # toolkit to build web api
+django-cors-headers==3.14.0 # django app to add CORS headers
+django-filter==22.1 # provides filtering support
+django-autoslug==1.9.8 # add autoslug support for your fields
+django-countries==7.5.1 # constains country specific data
+django-phonenumber-field==7.0.2
+phonenumbers==8.13.7 # google library for passing, storing and checking / verifying phone no
+drf-yasg==1.21.5 #This package allows for automated generation of real swagger or OpenAI 2.0 schemas for Django Rest framework
+Pillow==9.4.0 # python imaging library
+argon2-cffi==21.3.0 #And so this package provides secure password hashing using argon2 over Python.
+pytz==2022.7.1 #And this library allows for accurate and cross-platform time zone calculations.
+django-taggit==3.1.0 #Django Target is a reusable Django application for simple tagging.
+redis==4.5.1
+celery==5.2.7
+flower==1.2.0
+django-celery-email==3.0.0
+django-allauth==0.52.0
+djangorestframework-simplejwt==5.2.2
+dj-rest-auth==3.0.0
+django-elasticsearch-dsl==7.3.0
+django-elasticsearch-dsl-drf==0.22.5

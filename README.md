@@ -1,0 +1,1 @@
+# FOLO Money django application 

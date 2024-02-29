@@ -3,7 +3,7 @@ django-environ==0.11.2 # configure env for django
 djangorestframework==3.14.0 # toolkit to build web api
 django-cors-headers==3.14.0 # django app to add CORS headers
 django-filter==22.1 # provides filtering support
-django-autoslug==1.9.8 # add autoslug support for your fields
+django-autoslug==1.9.8 # add pipautoslug support for your fields
 django-countries==7.5.1 # constains country specific data
 django-phonenumber-field==7.0.2
 phonenumbers==8.13.7 # google library for passing, storing and checking / verifying phone no

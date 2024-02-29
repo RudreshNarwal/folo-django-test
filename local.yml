@@ -11,9 +11,9 @@ services:
             - static_volume:/app/staticfiles
             - media_volume:/app/mediafiles
         expose:
-            - "8000"
+            - "8009"
         ports:
-            - "8000:8000"
+            - "8009:8009"
         env_file:
             - ./.envs/.local/.django
             - ./.envs/.local/.postgres

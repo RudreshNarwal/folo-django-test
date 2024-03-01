@@ -10,10 +10,10 @@ services:
             - .:/app:z
             - static_volume:/app/staticfiles
             - media_volume:/app/mediafiles
-        expose:
-            - "8009"
-        ports:
-            - "8009:8009"
+        expose:  #expose: Documents the ports that the container uses, making them accessible to other containers within the same Docker network.
+            - "8000"
+#        ports:    #ports: Maps container ports to the host machine, making the service accessible externally.
+#            - "8009:8009"
         env_file:
             - ./.envs/.local/.django
             - ./.envs/.local/.postgres
@@ -103,20 +103,20 @@ services:
 #        networks:
 #            - folo-api
 #
-#    nginx:
-#        restart: always
-#        depends_on:
-#            - api
-#        volumes:
-#            - static_volume:/app/staticfiles
-#            - media_volume:/app/mediafiles
-#        build:
-#            context: ./docker/local/nginx
-#            dockerfile: Dockerfile
-#        ports:
-#            - "8080:80"
-#        networks:
-#            - folo-api
+    nginx:
+        restart: always
+        depends_on:
+            - api
+        volumes:
+            - static_volume:/app/staticfiles
+            - media_volume:/app/mediafiles
+        build:
+            context: ./docker/local/nginx
+            dockerfile: Dockerfile
+        ports:
+            - "8080:80"
+        networks:
+            - folo-api
 
 networks:
     folo-api:

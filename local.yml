@@ -29,6 +29,8 @@ services:
         build:
             context: .
             dockerfile: ./docker/local/postgres/Dockerfile
+        expose:
+            - "5432"
         ports:
             - "5432:5432"
         volumes:
@@ -36,6 +38,17 @@ services:
             - local_postgres_data_backups:/backups
         env_file:
             - ./.envs/.local/.postgres
+        networks:
+            - folo-api
+
+    pgadmin:
+        image: dpage/pgadmin4
+        env_file:
+            - ./.envs/.local/.pgadmin
+        ports:
+            - "5050:5050"
+        depends_on:
+            - postgres
         networks:
             - folo-api
 

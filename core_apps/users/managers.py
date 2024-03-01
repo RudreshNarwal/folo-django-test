@@ -12,11 +12,11 @@ class CustomUserManager(BaseUserManager):
 	def email_validator(self, email):
 		try:
 			validate_email(email)
-			return True
-		except ValidationError:
-			raise ValueError(_("You must provide a valid email address."))
+		except ValidationError as e:
+			error_messages = ", ".join(e.messages)
+			raise ValueError(f"Invalid email address: {error_messages}")
 	
-	def create_user(self, first_name, last_name, email, mobile, password, **extra_fields):
+	def create_user(self, first_name, last_name, mobile, email, password, **extra_fields):
 		if not first_name:
 			raise ValueError(_("Users must have a first name."))
 		if not last_name:
@@ -25,6 +25,7 @@ class CustomUserManager(BaseUserManager):
 			raise ValueError(_("Users must have a mobile."))
 		if email:
 			email = self.normalize_email(email)
+			print(email)
 			self.email_validator(email)
 		else:
 			raise ValueError(_("Users must have an email address."))

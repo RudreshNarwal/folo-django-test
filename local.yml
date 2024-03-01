@@ -29,6 +29,8 @@ services:
         build:
             context: .
             dockerfile: ./docker/local/postgres/Dockerfile
+        ports:
+            - "5432:5432"
         volumes:
             - local_postgres_data:/var/lib/postgresql/data
             - local_postgres_data_backups:/backups

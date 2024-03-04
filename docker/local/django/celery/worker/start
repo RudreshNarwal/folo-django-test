@@ -1,0 +1,17 @@
+#!/bin/bash
+
+set -o errexit
+set -o nounset
+
+exec watchfiles celery.__main__.main --args '-A foloDjango.celery worker -l INFO'
+
+ #the watch Files command, which watches for changes in Python files and automatically restarts the celery
+ #worker when changes are detected.
+ #Watch files should only be used for development.
+ #Using watch files in a production environment is not recommended as the purpose of watch files is to
+ #monitor for changes in source files and automatically restart processes when changes are detected.
+ #This behavior is useful during development as it saves time and streamlines the development process.
+ #However, in production, it introduces potential instability and security risks within production environments.
+ #
+ #Instead of using watch files in production, consider using more robust process management tools like
+ #systemd or supervisor to manage and monitor your celery workers and other application components.

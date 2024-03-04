@@ -60,49 +60,48 @@ services:
         networks:
             - folo-api
 
-#    redis:
-#        image: redis:6-alpine
-#        container_name: redis
-#        networks:
-#            - folo-api
-#
-#    celery_worker:
-#        build:
-#            context: .
-#            dockerfile: ./docker/local/django/Dockerfile
-#        command: /start-celeryworker
-#        container_name: celery_worker
-#        volumes:
-#            - .:/app
-#        env_file:
-#            - ./.envs/.local/.django
-#            - ./.envs/.local/.postgres
-#        depends_on:
-#            - redis
-#            - postgres
-#            - mailhog
-#        networks:
-#            - folo-api
-#
-#    flower:
-#        build:
-#            context: .
-#            dockerfile: ./docker/local/django/Dockerfile
-#        command: /start-flower
-#        container_name: flower
-#        volumes:
-#            - .:/app
-#        env_file:
-#            - ./.envs/.local/.django
-#            - ./.envs/.local/.postgres
-#        ports:
-#            - "5555:5555"
-#        depends_on:
-#            - redis
-#            - postgres
-#        networks:
-#            - folo-api
-#
+    redis:
+        image: redis:7-alpine
+        container_name: redis-folo
+        networks:
+            - folo-api
+
+    celery_worker:
+        build:
+            context: .
+            dockerfile: ./docker/local/django/Dockerfile
+        command: /start-celeryworker
+        container_name: celery_worker
+        volumes:
+            - .:/app
+        env_file:
+            - ./.envs/.local/.django
+            - ./.envs/.local/.postgres
+        depends_on:
+            - redis
+            - postgres
+            - mailhog
+        networks:
+            - folo-api
+
+    flower: # Flower is an open-source web application for monitoring and managing Celery clusters.
+        build:
+            context: .
+            dockerfile: ./docker/local/django/Dockerfile
+        command: /start-flower
+        volumes:
+            - flower_data:/data
+        env_file:
+            - ./.envs/.local/.django
+            - ./.envs/.local/.postgres
+        ports:
+            - "5555:5555"
+        depends_on:
+            - redis
+            - postgres
+        networks:
+            - folo-api
+
     nginx:
         restart: always
         depends_on:
@@ -127,3 +126,4 @@ volumes:
     local_postgres_data_backups: {}
     static_volume:
     media_volume:
+    flower_data:

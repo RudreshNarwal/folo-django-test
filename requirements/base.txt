@@ -16,8 +16,8 @@ redis==4.5.1
 celery==5.2.7
 flower==1.2.0
 django-celery-email==3.0.0
-django-allauth==0.52.0
-djangorestframework-simplejwt==5.2.2
-dj-rest-auth==3.0.0
+django-allauth==0.52.0 #Django all auth is an integrated set of Django applications, addressing authentication, registration, account management as well as third party or social account authentication.
+djangorestframework-simplejwt==5.2.2 # Simple JWT is a JSON web token authentication plugin for the Django rest framework.
+dj-rest-auth==3.0.0 # is a set of rest API endpoints to handle user registration and authentication tasks
 django-elasticsearch-dsl==7.3.0
 django-elasticsearch-dsl-drf==0.22.5

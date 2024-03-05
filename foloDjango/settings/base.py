@@ -1,4 +1,5 @@
 from pathlib import Path
+from datetime import timedelta
 import environ
 
 env = environ.Env()
@@ -31,17 +32,23 @@ THIRD_PARTY_APPS = [
 	"drf_yasg",
 	"corsheaders",
 	"djcelery_email",
+	"rest_framework.authtoken",
+	"allauth",
+	"allauth.account",
+	"allauth.socialaccount",
+	"dj_rest_auth",
+	"dj_rest_auth.registration",
 ]
 
 LOCAL_APPS = [
-    "core_apps.profiles",
-    "core_apps.common",
-    "core_apps.users",
-    # "core_apps.articles",
-    # "core_apps.ratings",
-    # "core_apps.bookmarks",
-    # "core_apps.responses",
-    # "core_apps.search",
+	"core_apps.profiles",
+	"core_apps.common",
+	"core_apps.users",
+	# "core_apps.articles",
+	# "core_apps.ratings",
+	# "core_apps.bookmarks",
+	# "core_apps.responses",
+	# "core_apps.search",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -92,10 +99,10 @@ DATABASES = {"default": env.db("DATABASE_URL")}
 # DATABASES["default"]["ATOMIC_REQUESTS"] = True
 
 PASSWORD_HASHERS = [
-    "django.contrib.auth.hashers.Argon2PasswordHasher",
-    "django.contrib.auth.hashers.PBKDF2PasswordHasher",
-    "django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher",
-    "django.contrib.auth.hashers.BCryptSHA256PasswordHasher",
+	"django.contrib.auth.hashers.Argon2PasswordHasher",
+	"django.contrib.auth.hashers.PBKDF2PasswordHasher",
+	"django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher",
+	"django.contrib.auth.hashers.BCryptSHA256PasswordHasher",
 ]
 
 # Password validation
@@ -127,7 +134,7 @@ USE_I18N = True
 
 USE_TZ = True
 
-SITE_ID = 1 #default site for the project is 1
+SITE_ID = 1  # default site for the project is 1
 
 ADMIN_URL = "supersecret/"
 
@@ -158,23 +165,65 @@ CELERY_RESULT_BACKEND_MAX_RETRIES = 10
 CELERY_TASK_SEND_SENT_EVENT = True
 
 if USE_TZ:
-    CELERY_TIMEZONE = TIME_ZONE
+	CELERY_TIMEZONE = TIME_ZONE
+	
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "dj_rest_auth.jwt_auth.JWTCookieAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+    "DEFAULT_FILTER_BACKENDS": [
+        "django_filters.rest_framework.DjangoFilterBackend",
+    ],
+}
+
+SIMPLE_JWT = {
+    "AUTH_HEADER_TYPES": ("Bearer",),
+    "ACCESS_TOKEN_LIFETIME": timedelta(days=30),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=31),
+    "ROTATE_REFRESH_TOKENS": True,
+    "SIGNING_KEY": env("SIGNING_KEY"),
+    "USER_ID_FIELD": "id",
+    "USER_ID_CLAIM": "user_id",
+}
+
+REST_AUTH = {
+    "USE_JWT": True,
+    "JWT_AUTH_COOKIE": "folo-access-token",
+    "JWT_AUTH_REFRESH_COOKIE": "folo-refresh-token",
+    "REGISTER_SERIALIZER": "core_apps.users.serializers.CustomRegisterSerializer",
+}
+
+AUTHENTICATION_BACKENDS = [
+    "allauth.account.auth_backends.AuthenticationBackend",
+    "django.contrib.auth.backends.ModelBackend",
+]
+
+ACCOUNT_AUTHENTICATION_METHOD = "email"
+ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_EMAIL_VERIFICATION = "mandatory"
+ACCOUNT_CONFIRM_EMAIL_ON_GET = True
+ACCOUNT_EMAIL_CONFIRMATION_EXPIRE_DAYS = 1
+ACCOUNT_USER_MODEL_USERNAME_FIELD = None
+ACCOUNT_USERNAME_REQUIRED = False
 
 LOGGING = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "formatters": {
-        "verbose": {
-            "format": "%(levelname)s %(name)-12s %(asctime)s %(module)s "
-            "%(process)d %(thread)d %(message)s"
-        }
-    },
-    "handlers": {
-        "console": {
-            "level": "DEBUG",
-            "class": "logging.StreamHandler",
-            "formatter": "verbose",
-        }
-    },
-    "root": {"level": "INFO", "handlers": ["console"]},
+	"version": 1,
+	"disable_existing_loggers": False,
+	"formatters": {
+		"verbose": {
+			"format": "%(levelname)s %(name)-12s %(asctime)s %(module)s "
+			          "%(process)d %(thread)d %(message)s"
+		}
+	},
+	"handlers": {
+		"console": {
+			"level": "DEBUG",
+			"class": "logging.StreamHandler",
+			"formatter": "verbose",
+		}
+	},
+	"root": {"level": "INFO", "handlers": ["console"]},
 }

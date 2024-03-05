@@ -16,4 +16,4 @@ EMAIL_HOST = env("EMAIL_HOST", default="mailhog")
 EMAIL_PORT = env("EMAIL_PORT")
 DEFAULT_FROM_EMAIL = "rudresh@ubuntuonline.co.ke"
 DOMAIN = env("DOMAIN")
-SITE_NAME = "FoloMoney-Core"
+SITE_NAME = "FoloMoney"

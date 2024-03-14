@@ -17,4 +17,4 @@ class CreditReport(models.Model):
     message_total_loan_outstanding = models.TextField(null=True, blank=True)
 
     def __str__(self):
-        return f"{self.user.first_name} - Score: {self.credit_score} - Grade: {self.grade}"
+        return f"{self.user} - Score: {self.credit_score} - Grade: {self.grade}"

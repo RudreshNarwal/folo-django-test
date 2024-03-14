@@ -15,3 +15,46 @@ def register_with_third_party_api(data):
     })
     response = requests.post(url, json=data, headers=headers)
     return response.json()
+
+def fetch_credit_risk_score(data):
+    url = "https://secure3.crbafrica.com/crbws/rest/nipashe_indirect/ke/credit_risk_score"
+    headers = {"Content-Type": "application/json"}
+    # Add authentication and other required info to the data
+    data.update({
+        "username": settings.TRANSUNION_UAT_USERNAME,
+        "password": settings.TRANSUNION_UAT_PASSWORD,
+        "code": settings.TRANSUNION_UAT_CODE,
+    })
+    response = requests.post(url, json=data, headers=headers)
+    return response.json()
+
+
+def fetch_total_outstanding_loan(data):
+    url = "https://secure3.crbafrica.com/crbws/rest/nipashe_indirect/ke/total_outstanding_loan"
+    headers = {"Content-Type": "application/json"}
+    
+    # It's advisable to use Django's settings for sensitive credentials
+    data.update({
+        "username": settings.TRANSUNION_USERNAME,
+        "password": settings.TRANSUNION_PASSWORD,
+        "code": settings.TRANSUNION_CODE,
+        "infinityCode": settings.TRANSUNION_INFINITY_CODE,
+    })
+    
+    response = requests.post(url, json=data, headers=headers)
+    return response.json()
+
+
+def send_email_creditview_report(data):
+    url = "https://secure3.crbafrica.com/crbws/rest/nipashe_indirect/ke/email_creditview_report"
+    headers = {"Content-Type": "application/json"}
+    
+    data.update({
+        "username": settings.TRANSUNION_USERNAME,
+        "password": settings.TRANSUNION_PASSWORD,
+        "code": settings.TRANSUNION_CODE,
+        "infinityCode": settings.TRANSUNION_INFINITY_CODE,
+    })
+    
+    response = requests.post(url, json=data, headers=headers)
+    return response.json()

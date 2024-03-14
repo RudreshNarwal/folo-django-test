@@ -1,29 +1,68 @@
 from django.http import JsonResponse
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from django.utils.decorators import method_decorator
+from rest_framework import status
 
 from . import services
 from .models import CreditReport
 
 
-
-def register(request):
-	if request.method == "POST":
-		# Assuming you're receiving JSON data
-		data = request.POST
+class RegisterView(APIView):
+	def post(self, request, *args, **kwargs):
+		# Here, it's assumed that the request's content type is 'application/json'
+		# and thus, `request.data` will contain the parsed JSON data.
+		data = request.data
 		
-		# Call the 3rd party API
+		# Call the 3rd party API with the provided data.
 		api_response = services.register_with_third_party_api(data)
 		
-		# Save the response to the database
 		CreditReport.objects.create(
-			username=data.get("username"),
-			document_number=data.get("documentNumber"),
-			telephone_mobile=data.get("telephoneMobile"),
-			response_code=api_response.get("responseCode"),
-			data=api_response.get("data", None),
-			message=api_response.get("message")
+		
 		)
 		
-		# Return the API response
-		return JsonResponse(api_response)
-	else:
-		return JsonResponse({"error": "This endpoint only supports POST requests."}, status=405)
+		# Return the API response. You might adjust the status code based on the actual
+		# API response or any other logic you have in place.
+		return Response(api_response, status=status.HTTP_200_OK if api_response.get("responseCode") == 200 else status.HTTP_400_BAD_REQUEST)
+
+
+class CheckCreditRiskScoreView(APIView):
+	permission_classes = [IsAuthenticated]
+	
+	def post(self, request, *args, **kwargs):
+		# Convert QueryDict to dictionary
+		data = request.data
+		
+		# Call your service layer
+		api_response = services.fetch_credit_risk_score(data)
+		
+		CreditReport.objects.update(
+		
+		)
+		
+		return Response(api_response, status=status.HTTP_200_OK if api_response.get("responseCode") == 200 else status.HTTP_400_BAD_REQUEST)
+
+
+class CheckTotalOutstandingLoanView(APIView):
+	permission_classes = [IsAuthenticated]
+	
+	def post(self, request, *args, **kwargs):
+		data = request.data.copy()
+		api_response = services.fetch_total_outstanding_loan(data)
+		
+		CreditReport.objects.update(
+		
+		)
+		
+		return Response(api_response, status=status.HTTP_200_OK if api_response.get("responseCode") == 200 else status.HTTP_400_BAD_REQUEST)
+
+
+class EmailCreditViewReportView(APIView):
+	permission_classes = [IsAuthenticated]
+	
+	def post(self, request, *args, **kwargs):
+		data = request.data.copy()
+		api_response = services.send_email_creditview_report(data)
+		
+		return Response(api_response, status=status.HTTP_200_OK if api_response.get("responseCode") == 200 else status.HTTP_400_BAD_REQUEST)

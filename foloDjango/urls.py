@@ -32,6 +32,8 @@ urlpatterns = [
 		PasswordResetConfirmView.as_view(),
 		name="password_reset_confirm",
 	),
+    # path('transunion/', include('transunion.urls')),
+	
 ]
 
 admin.site.site_header = "FoloMoney API Admin"

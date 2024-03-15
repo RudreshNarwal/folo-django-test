@@ -4,7 +4,7 @@ import requests
 from django.contrib.auth import get_user_model
 from django.conf import settings
 
-def register_with_third_party_api(data):
+def register_with_tu(data):
     url = "https://secure3.crbafrica.com/crbws/rest/nipashe_indirect/ke/register"
     headers = {"Content-Type": "application/json"}
     data.update({

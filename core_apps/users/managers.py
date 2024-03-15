@@ -9,6 +9,7 @@ from django.utils.translation import gettext_lazy as _
 
 class CustomUserManager(BaseUserManager):
 	# overriding default django user methods
+	use_in_migrations = True
 	def email_validator(self, email):
 		try:
 			validate_email(email)

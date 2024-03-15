@@ -8,8 +8,11 @@ SECRET_KEY = env("DJANGO_SECRET_KEY", default="sVsP1LinBegCrAxKpK45gG_u3ugDaZ9yy
 DEBUG = True
 
 CSRF_TRUSTED_ORIGINS = ["http://localhost:8080"]
-
 ALLOWED_HOSTS = ["localhost", "0.0.0.0", "127.0.0.1"]
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
+# CORS_ALLOWED_ORIGINS = ['http://localhost:8080', "https://dev-api.folo.money"]
+# CSRF_TRUSTED_ORIGINS = ['http://localhost:8080', "https://dev-api.folo.money"]
 
 EMAIL_BACKEND = "djcelery_email.backends.CeleryEmailBackend"
 EMAIL_HOST = env("EMAIL_HOST", default="mailhog")

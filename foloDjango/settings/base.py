@@ -32,12 +32,14 @@ THIRD_PARTY_APPS = [
 	"drf_yasg",
 	"corsheaders",
 	"djcelery_email",
+	'rest_framework_simplejwt',
+	#extra
 	"rest_framework.authtoken",
-	"allauth",
-	"allauth.account",
-	"allauth.socialaccount",
-	"dj_rest_auth",
-	"dj_rest_auth.registration",
+	# "allauth",
+	# "allauth.account",
+	# "allauth.socialaccount",
+	# "dj_rest_auth",
+	# "dj_rest_auth.registration",
 ]
 
 LOCAL_APPS = [
@@ -152,9 +154,7 @@ MEDIA_ROOT = str(ROOT_DIR / "mediafiles")
 # https://docs.djangoproject.com/en/4.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-
 CORS_URLS_REGEX = r"^/api/.*$"
-
 AUTH_USER_MODEL = "users.User"
 
 CELERY_BROKER_URL = env("CELERY_BROKER")
@@ -180,35 +180,50 @@ REST_FRAMEWORK = {
     ],
 }
 
+# SIMPLE_JWT = {
+#     "AUTH_HEADER_TYPES": ("Bearer",),
+#     "ACCESS_TOKEN_LIFETIME": timedelta(days=30),
+#     "REFRESH_TOKEN_LIFETIME": timedelta(days=31),
+#     "ROTATE_REFRESH_TOKENS": True,
+#     "SIGNING_KEY": env("SIGNING_KEY"),
+#     "USER_ID_FIELD": "id",
+#     "USER_ID_CLAIM": "user_id",
+# }
+
 SIMPLE_JWT = {
-    "AUTH_HEADER_TYPES": ("Bearer",),
-    "ACCESS_TOKEN_LIFETIME": timedelta(days=30),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=31),
-    "ROTATE_REFRESH_TOKENS": True,
-    "SIGNING_KEY": env("SIGNING_KEY"),
-    "USER_ID_FIELD": "id",
-    "USER_ID_CLAIM": "user_id",
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=365),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'AUTH_HEADER_TYPES': ('Bearer',),
+    'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
+    'USER_AUTHENTICATION_RULE': 'rest_framework_simplejwt.authentication.default_user_authentication_rule',
+    'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
+    'TOKEN_TYPE_CLAIM': 'token_type',
+    'TOKEN_USER_CLASS': 'rest_framework_simplejwt.models.TokenUser',
+    'JTI_CLAIM': 'jti',
+	"SIGNING_KEY": env("SIGNING_KEY"),
 }
 
-REST_AUTH = {
-    "USE_JWT": True,
-    "JWT_AUTH_COOKIE": "folo-access-token",
-    "JWT_AUTH_REFRESH_COOKIE": "folo-refresh-token",
-    "REGISTER_SERIALIZER": "core_apps.users.serializers.CustomRegisterSerializer",
-}
+# REST_AUTH = {
+#     "USE_JWT": True,
+#     "JWT_AUTH_COOKIE": "folo-access-token",
+#     "JWT_AUTH_REFRESH_COOKIE": "folo-refresh-token",
+#     "REGISTER_SERIALIZER": "core_apps.users.serializers.CustomRegisterSerializer",
+# }
 
-AUTHENTICATION_BACKENDS = [
-    "allauth.account.auth_backends.AuthenticationBackend",
-    "django.contrib.auth.backends.ModelBackend",
-]
+# AUTHENTICATION_BACKENDS = [
+#     "allauth.account.auth_backends.AuthenticationBackend",
+#     "django.contrib.auth.backends.ModelBackend",
+# ]
 
-ACCOUNT_AUTHENTICATION_METHOD = "email"
-ACCOUNT_EMAIL_REQUIRED = True
-ACCOUNT_EMAIL_VERIFICATION = "mandatory"
-ACCOUNT_CONFIRM_EMAIL_ON_GET = True
-ACCOUNT_EMAIL_CONFIRMATION_EXPIRE_DAYS = 1
-ACCOUNT_USER_MODEL_USERNAME_FIELD = None
-ACCOUNT_USERNAME_REQUIRED = False
+# ACCOUNT_AUTHENTICATION_METHOD = "email"
+# ACCOUNT_EMAIL_REQUIRED = True
+# ACCOUNT_EMAIL_VERIFICATION = "mandatory"
+# ACCOUNT_CONFIRM_EMAIL_ON_GET = True
+# ACCOUNT_EMAIL_CONFIRMATION_EXPIRE_DAYS = 1
+# ACCOUNT_USER_MODEL_USERNAME_FIELD = None
+# ACCOUNT_USERNAME_REQUIRED = False
 
 LOGGING = {
 	"version": 1,

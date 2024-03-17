@@ -18,6 +18,9 @@ jobs:
           echo "${{ env.ENV_BASE64_DJANGO }}" | base64 --decode > combined.env.django
           cp combined.env.django ./.envs/.production/.django
 
+      - name: Create Docker Network
+        run: docker network create reverseproxy_nw || true
+
       - name: Build Docker images
         run: docker compose -f production.yml up --build -d --remove-orphans
 

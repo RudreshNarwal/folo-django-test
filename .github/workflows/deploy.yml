@@ -31,9 +31,11 @@ jobs:
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_KEY }}
           script: |
+            pwd
+            ls -lah  # Optional: List files in the current directory for debugging
             sudo mkdir -p /app  # Create /app folder if it doesn't exist
             sudo chown -R $USER:$USER /app  # Set ownership
-            sudo rsync -a --delete ./ /app/  # Copy project files to /app
+            sudo rsync -avh --delete ./ /app/  # Copy project files to /app
             ls -l /app
             ls -l /app/production.yml  # Directly check for production.yml
             cd /app

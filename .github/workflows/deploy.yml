@@ -48,13 +48,13 @@ jobs:
             sudo chown -R $USER:$USER /app
 
             echo "** Copying project files... **"
-            sudo rsync -avh --delete --info=progress2 ./ /app/  || (echo "** rsync failed!**" && exit 1)
-#            ls -l /app
-#            ls -l /app/production.yml
-#
-#            cd /app
-#
-#            echo "** Building and starting Docker containers... **"
-#            docker compose -f production.yml up --build -d --remove-orphans || (echo "** Docker Compose failed!**" && exit 1)
-#
-#            echo "** Deployment completed successfully! **"
+            sudo rsync -avh --delete --dry-run ./ /app/  || (echo "** rsync failed!**" && exit 1)
+            ls -l /app
+            ls -l /app/production.yml
+
+            cd /app
+
+            echo "** Building and starting Docker containers... **"
+            docker compose -f production.yml up --build -d --remove-orphans || (echo "** Docker Compose failed!**" && exit 1)
+
+            echo "** Deployment completed successfully! **"

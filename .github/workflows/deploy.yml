@@ -34,5 +34,7 @@ jobs:
             sudo mkdir -p /app  # Create /app folder if it doesn't exist
             sudo chown -R $USER:$USER /app  # Set ownership
             sudo rsync -a --delete ./ /app/  # Copy project files to /app
+            ls -l /app
+            ls -l /app/production.yml  # Directly check for production.yml
             cd /app
             docker compose -f production.yml up --build -d --remove-orphans

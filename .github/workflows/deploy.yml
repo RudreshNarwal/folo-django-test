@@ -31,12 +31,28 @@ jobs:
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_KEY }}
           script: |
+            set -e  # Exit on first error
+
+            echo "** Connected to EC2 server **"
+
             pwd
-            ls -lah  # Optional: List files in the current directory for debugging
-            sudo mkdir -p /app  # Create /app folder if it doesn't exist
-            sudo chown -R $USER:$USER /app  # Set ownership
-            sudo rsync -avh --delete ./ /app/  # Copy project files to /app
+            ls -lah
+
+            # Create app directory (if needed)
+            sudo mkdir -p /app || true
+
+            # Set ownership with minimal privileges (adjust as needed)
+            sudo chown -R $USER:$USER /app
+
+            echo "** Copying project files... **"
+            sudo rsync -avh --delete ./ /app/  || (echo "** rsync failed!**" && exit 1)
+
             ls -l /app
-            ls -l /app/production.yml  # Directly check for production.yml
+            ls -l /app/production.yml
+
             cd /app
-            docker compose -f production.yml up --build -d --remove-orphans
+
+            echo "** Building and starting Docker containers... **"
+            docker compose -f production.yml up --build -d --remove-orphans || (echo "** Docker Compose failed!**" && exit 1)
+
+            echo "** Deployment completed successfully! **"

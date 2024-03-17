@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Build Docker images
-        run: docker-compose -f docker-compose.prod.yml build
+        run: docker-compose -f production.yml build
       - name: Deploy to EC2
         uses: appleboy/ssh-action@master
         with:

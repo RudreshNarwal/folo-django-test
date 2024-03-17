@@ -7,7 +7,7 @@ from rest_framework import serializers
 
 
 
-class RegisterUserSerializer(serializers.ModelSerializer):
+class RegisterUserMobileSerializer(serializers.ModelSerializer):
     mobile = serializers.CharField(required=True, max_length=15, min_length=5)
 
     class Meta:
@@ -16,11 +16,18 @@ class RegisterUserSerializer(serializers.ModelSerializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
+    mobile = serializers.CharField(required=True, max_length=15, min_length=5)
+    nation_id = serializers.CharField(required=True, max_length=20)
+    first_name = serializers.CharField(required=True, max_length=128)
+    middle_name = serializers.CharField(required=False, max_length=128, allow_null=True, allow_blank=True)
+    last_name = serializers.CharField(required=False, max_length=128, allow_null=True, allow_blank=True)
+    email=serializers.EmailField(required=True)
+    dob = serializers.DateField(required=True)
     class Meta:
         model = User
         fields = [
-            'id', 'first_name', 'middle_name', 'last_name', 'is_name_verified', "dob", "mobile",
-            'is_mobile_verified', 'email', "gender",
+            'pkid', 'id', 'first_name', 'middle_name', 'last_name', "dob", "mobile",
+            'is_mobile_verified', 'email', "gender", "nation_id", "is_email_verified"
         ]
 
 

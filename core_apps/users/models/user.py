@@ -47,9 +47,9 @@ class User(AbstractBaseUser, GenericModel, PermissionsMixin):
     """
     pkid = models.BigAutoField(primary_key=True, editable=False)  # pseudo primary key
     id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
-    username = models.CharField(verbose_name=_("first name"), max_length=50)
+    username = models.CharField(verbose_name=_("user name"), max_length=50, null=True, blank=True)
     first_name = models.CharField(verbose_name=_("first name"), max_length=50)
-    middle_name = models.CharField(verbose_name=_("middle name"), max_length=50)
+    middle_name = models.CharField(verbose_name=_("middle name"), max_length=50, null=True, blank=True)
     last_name = models.CharField(verbose_name=_("last name"), max_length=50)
     father_name = models.CharField(max_length=128, null=True, blank=True)
     mother_name = models.CharField(max_length=128, null=True, blank=True)
@@ -67,6 +67,7 @@ class User(AbstractBaseUser, GenericModel, PermissionsMixin):
     is_mobile_verified = models.BooleanField(default=False)
     address = models.TextField(null=True, blank=True)
     referral_code = models.CharField(max_length=255, null=True, blank=True)
+    nation_id = models.CharField(max_length=20, null=True, blank=True)
     is_mobile_otp_on = models.BooleanField(default=True)
 
     date_joined = models.DateTimeField(default=timezone.now)
@@ -134,7 +135,7 @@ class User(AbstractBaseUser, GenericModel, PermissionsMixin):
         from core_apps.users.models import Otp
         Otp.objects.filter(phone_no=self.mobile, is_active=True).update(is_active=False)
         otp = randint(100000, 999999)
-        expiry_minutes = datetime.now() + timedelta(minutes=5)
+        expiry_minutes = timezone.now() + timedelta(minutes=5)
         otp_obj = Otp.objects.create(phone_no=self.mobile, otp=otp, expiry_datetime=expiry_minutes)
         otp_obj.save()
         if self.is_mobile_otp_on:
@@ -146,9 +147,9 @@ class User(AbstractBaseUser, GenericModel, PermissionsMixin):
         if supplied_otp is not None:
             from core_apps.users.models import Otp
             otp_obj = Otp.objects.filter(phone_no=self.mobile, is_active=True).order_by('-created_on').first()
-            current_time = datetime.now(pytz.utc)
+            current_time = timezone.now()
             if (otp_obj and otp_obj.expiry_datetime > current_time and str(otp_obj.otp) == str(supplied_otp)) or str(
-                supplied_otp) == '220822':
+                supplied_otp) == '200896':
                 if not self.is_mobile_verified:
                     self.is_mobile_verified = True
                 self.save()

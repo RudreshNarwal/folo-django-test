@@ -55,6 +55,6 @@ jobs:
             cd /app
 
             echo "** Building and starting Docker containers... **"
-            docker compose -f production.yml up --build -d --remove-orphans || (echo "** Docker Compose failed!**" && exit 1)
+            sudo docker compose -f production.yml up --build -d --remove-orphans || (echo "** Docker Compose failed!**" && exit 1)
 
             echo "** Deployment completed successfully! **"

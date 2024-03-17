@@ -22,7 +22,7 @@ services:
             - ./.envs/.production/.django
             - ./.envs/.production/.postgres
         depends_on:
-            - postgres
+#            - postgres
             - redis
 #            - es
         networks:

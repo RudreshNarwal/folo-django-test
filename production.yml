@@ -20,26 +20,12 @@ services:
             - media_volume:/app/mediafiles
         env_file:
             - ./.envs/.production/.django
-            - ./.envs/.production/.postgres
         depends_on:
 #            - postgres
             - redis
 #            - es
         networks:
             - reverseproxy_nw
-
-#    postgres:
-#        build:
-#            context: .
-#            dockerfile: ./docker/production/postgres/Dockerfile
-#        image: folo_money_database
-#        volumes:
-#            - production_postgres_data:/var/lib/postgresql/data
-#            - production_postgres_data_backups:/backups
-#        env_file:
-#            - ./.envs/.production/.postgres
-#        networks:
-#            - reverseproxy_nw
 
     redis:
         image: redis:7-alpine

@@ -69,8 +69,7 @@ jobs:
               echo "** Cloning repository into /app... **"
               pwd
               ls -l
-              cd app
-              git clone -b dev git@github.com:RudreshNarwal/folo.django.git
+              git clone -b dev git@github.com:RudreshNarwal/folo.django.git /app
             fi
 
             cd /app

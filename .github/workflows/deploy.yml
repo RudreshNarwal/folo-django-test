@@ -56,7 +56,7 @@ jobs:
             sudo chown -R $USER:$USER /app
 
             echo "** Copying project files... **"
-            sudo rsync -avvh ./ /app/  || (echo "** rsync failed! Detailed error above. **" && exit 1)
+            sudo rsync -avvh --delete --chown=github:www-data --chmod=Dg=rwx,Fg=rwx ./ /app/ || (echo "** rsync failed! Detailed error above. **" && exit 1)
 
             echo "** Listing /app directory contents **"
             ls -l /app

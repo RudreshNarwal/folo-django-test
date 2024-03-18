@@ -4,7 +4,7 @@ set -o errexit
 set -o nounset
 
 worker_ready(){
-  celery -A authors_api.celery inspect ping
+  celery -A foloDjango.celery inspect ping
 }
 
 until worker_ready; do

@@ -50,10 +50,10 @@ jobs:
               echo "** /app is a Git repository. Fetching latest changes... **"
               cd /app
               # Ensure the repository is set to the correct remote and branch
-              sudo git remote set-url origin git@github.com:RudreshNarwal/folo.django.git
-              sudo git fetch origin dev
-              sudo git reset --hard origin/dev
-              sudo git clean -fd
+              git remote set-url origin git@github.com:RudreshNarwal/folo.django.git
+              git fetch origin dev
+              git reset --hard origin/dev
+              git clean -fd
             else
               if [ -d "/app" ]; then
                 echo "** /app exists but is not a Git repo. Removing... **"
@@ -61,7 +61,9 @@ jobs:
               fi
               # Clone the repository as /app did not exist or was not a Git repository
               echo "** Cloning repository into /app... **"
-              sudo git clone -b dev git@github.com:RudreshNarwal/folo.django.git /app
+              pwd
+              ll
+              git clone -b dev git@github.com:RudreshNarwal/folo.django.git /app
             fi
 
             cd /app

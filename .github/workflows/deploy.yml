@@ -55,7 +55,7 @@ jobs:
             sudo chown -R $USER:$USER /app
 
             echo "** Copying project files... **"
-            sudo rsync -avh --delete ./ /app/  || (echo "** rsync failed! **" && exit 1)
+            sudo rsync -avh --delete --dry-run ./ /app/  || (echo "** rsync failed! **" && exit 1)
 
             ls -l /app
             ls -l /app/production.yml

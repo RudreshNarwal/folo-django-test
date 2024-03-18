@@ -41,20 +41,28 @@ jobs:
             pwd
             ls -lah
 
-            # Create app directory (if needed)
-            sudo mkdir -p /app || true
+            # Check if app directory exists. If so, delete it.
+            if [ -d "/app" ]; then
+              echo "** /app directory exists. Deleting... **"
+              sudo rm -rf /app
+            fi
+
+            # Create app directory
+            echo "** Creating /app directory... **"
+            sudo mkdir -p /app
 
             # Set ownership with minimal privileges (adjust as needed)
             sudo chown -R $USER:$USER /app
 
             echo "** Copying project files... **"
-            sudo rsync -avh --delete --dry-run ./ /app/  || (echo "** rsync failed!**" && exit 1)
+            sudo rsync -avh --delete ./ /app/  || (echo "** rsync failed! **" && exit 1)
+
             ls -l /app
             ls -l /app/production.yml
 
             cd /app
 
             echo "** Building and starting Docker containers... **"
-            sudo docker compose -f production.yml up --build -d --remove-orphans || (echo "** Docker Compose failed!**" && exit 1)
+            sudo docker compose -f production.yml up --build -d --remove-orphans || (echo "** Docker Compose failed! **" && exit 1)
 
             echo "** Deployment completed successfully! **"

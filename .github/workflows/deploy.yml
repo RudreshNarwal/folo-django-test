@@ -38,37 +38,31 @@ jobs:
 
             echo "** Connected to EC2 server **"
 
-            pwd
-            echo "** Listing current directory contents **"
-            ls -lah
-
-            # Check if app directory exists. If so, delete it.
-            if [ -d "/app" ]; then
-              echo "** /app directory exists. Deleting... **"
-              sudo rm -rf /app
+            # Ensure Git is installed
+            if ! command -v git &> /dev/null
+            then
+                echo "Git could not be found, installing..."
+                sudo apt-get update && sudo apt-get install git -y
             fi
 
-            # Create app directory
-            echo "** Creating /app directory... **"
-            sudo mkdir -p /app
-
-            # Set ownership with minimal privileges (adjust as needed)
-            sudo chown -R $USER:$USER /app
-
-            echo "** Copying project files... **"
-            sudo rsync -avvh --delete --chown=github:www-data --chmod=Dg=rwx,Fg=rwx ./ /app/ || (echo "** rsync failed! Detailed error above. **" && exit 1)
-
-            echo "** Listing /app directory contents **"
-            ls -l /app
+            # Check if app directory exists. If so, prepare to update the repo
+            if [ -d "/app" ]; then
+              echo "** /app directory exists. Fetching latest changes... **"
+              cd /app
+              # Fetch the latest changes without affecting the working directory
+              sudo git fetch origin dev
+              sudo git reset --hard origin/dev
+              sudo git clean -fd
+            else
+              # Clone the repository if /app does not exist
+              echo "** Cloning repository into /app... **"
+              sudo git clone -b dev git@github.com:RudreshNarwal/folo.django.git /app
+            fi
 
             cd /app
 
-            if [ -f "production.yml" ]; then
-              echo "** Found production.yml **"
-              ls -l production.yml
-            else
-              echo "** Warning: production.yml does not exist. **"
-            fi
+            # Here, include any steps required to prepare the application environment,
+            # such as running migrations, compiling assets, etc.
 
             echo "** Building and starting Docker containers... **"
             sudo docker compose -f production.yml up --build -d --remove-orphans || (echo "** Docker Compose failed! **" && exit 1)

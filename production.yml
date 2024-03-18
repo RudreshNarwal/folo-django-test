@@ -15,6 +15,8 @@ services:
             dockerfile: ./docker/production/django/Dockerfile
         command: /start
         image: folo_money
+        expose: #expose: Documents the ports that the container uses, making them accessible to other containers within the same Docker network.
+            - "8999"
         volumes:
             - static_volume:/app/staticfiles
             - media_volume:/app/mediafiles

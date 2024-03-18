@@ -60,7 +60,7 @@ jobs:
                 sudo rm -rf /app
               fi
               echo "** Creating /app directory... **"
-              mkdir -p /app
+              sudo mkdir -p /app
               # Adjust the permission as needed. Example: making the current user the owner
               # This step assumes the current user has sufficient permissions to do so
               sudo chown $USER:$USER /app

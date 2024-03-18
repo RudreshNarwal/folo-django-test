@@ -39,6 +39,7 @@ jobs:
             echo "** Connected to EC2 server **"
 
             pwd
+            echo "** Listing current directory contents **"
             ls -lah
 
             # Check if app directory exists. If so, delete it.
@@ -55,12 +56,19 @@ jobs:
             sudo chown -R $USER:$USER /app
 
             echo "** Copying project files... **"
-            sudo rsync -avh --delete --dry-run ./ /app/  || (echo "** rsync failed! **" && exit 1)
+            sudo rsync -avvh ./ /app/  || (echo "** rsync failed! Detailed error above. **" && exit 1)
 
+            echo "** Listing /app directory contents **"
             ls -l /app
-            ls -l /app/production.yml
 
             cd /app
+
+            if [ -f "production.yml" ]; then
+              echo "** Found production.yml **"
+              ls -l production.yml
+            else
+              echo "** Warning: production.yml does not exist. **"
+            fi
 
             echo "** Building and starting Docker containers... **"
             sudo docker compose -f production.yml up --build -d --remove-orphans || (echo "** Docker Compose failed! **" && exit 1)

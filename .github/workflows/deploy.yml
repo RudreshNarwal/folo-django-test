@@ -60,10 +60,17 @@ jobs:
                 sudo rm -rf /app
               fi
               # Clone the repository as /app did not exist or was not a Git repository
+              echo "** Creating /app directory... **"
+              mkdir -p /app
+  # Adjust the permission as needed. Example: making the current user the owner
+  # This step assumes the current user has sufficient permissions to do so
+              sudo chown $USER:$USER /app
+              sudo chmod 755 /app
               echo "** Cloning repository into /app... **"
               pwd
               ls -l
-              git clone -b dev git@github.com:RudreshNarwal/folo.django.git /app
+              cd app
+              git clone -b dev git@github.com:RudreshNarwal/folo.django.git
             fi
 
             cd /app

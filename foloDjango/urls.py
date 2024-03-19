@@ -26,7 +26,7 @@ schema_view = get_schema_view(
 router = DefaultRouter()
 
 router.register(r'api/v1/auth', auth.AuthView, basename='auth')
-router.register(r'api/v1/users', user.UserView, basename='users')
+router.register(r'api/v1/users', user.UserViewSet, basename='users')
 
 urlpatterns = [
 	path("redoc/", schema_view.with_ui("redoc", cache_timeout=0)),

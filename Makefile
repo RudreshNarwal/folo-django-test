@@ -37,7 +37,7 @@ down-v:
 volume:
 	docker volume inspect src_local_postgres_data
 
-authors-db:
+folo-db:
 	docker compose -f local.yml exec postgres psql --username=rudresh --dbname=folo-money
 
 flake8:

@@ -77,6 +77,9 @@ jobs:
             mkdir -p ./.envs/.production/
             echo "${{ env.ENV_BASE64_DJANGO }}" | base64 --decode > combined.env.django
             cp combined.env.django ./.envs/.production/.django
+            # Remove the combined.env.django file
+            rm combined.env.django
+
 
             # Here, include any steps required to prepare the application environment,
             # such as running migrations, compiling assets, etc.
@@ -91,5 +94,6 @@ jobs:
             echo "** Creating Makefile and Removing old Makefile **"
             echo "${{ env.ENV_BASE64_MAKEFILE }}" | base64 --decode > testmake
             cp testmake Makefile
+            rm testmake
 
             echo "** Deployment completed successfully! **"

@@ -24,10 +24,12 @@ def send_verification_code(mobile, code):
         "Accept": "application/json",
         "Content-Type": "application/x-www-form-urlencoded",
     }
+    
+    mobile_numbers=f"+254{mobile}"
 
     data = {
         "username": username,
-        "to": mobile,
+        "to": mobile_numbers,
         "message": message,
         "from": sender_id,
     }

@@ -37,6 +37,15 @@ class UserView(viewsets.ViewSet):
     @action(detail=False, methods=['post'], permission_classes=[AllowAny])
     def register(self, request):
         serializer = UserSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        mobile = serializer.validated_data.get('mobile')
+        
+        if mobile and User.objects.filter(mobile=mobile).exists():
+            return response.Response({
+                "message": "User already registered."
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
         if serializer.is_valid():
             user = serializer.save()
             return response.Response({

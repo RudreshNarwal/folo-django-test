@@ -5,8 +5,10 @@ from drf_yasg import openapi
 from drf_yasg import openapi
 from drf_yasg.views import get_schema_view
 from rest_framework import permissions
+from rest_framework.routers import DefaultRouter
 
-from core_apps.users.views import CustomUserDetailsView
+from core_apps.users.apis import user, auth
+# from core_apps.users.views import CustomUserDetailsView
 from dj_rest_auth.views import PasswordResetConfirmView
 
 schema_view = get_schema_view(
@@ -21,17 +23,16 @@ schema_view = get_schema_view(
 	permission_classes=(permissions.AllowAny,),
 )
 
+router = DefaultRouter()
+
+router.register(r'api/v1/auth', auth.AuthView, basename='auth')
+router.register(r'api/v1/users', user.UserView, basename='users')
+
 urlpatterns = [
 	path("redoc/", schema_view.with_ui("redoc", cache_timeout=0)),
 	path(settings.ADMIN_URL, admin.site.urls),
-	path("api/v1/auth/user/", CustomUserDetailsView.as_view(), name="user_details"),
-	path("api/v1/auth/", include("dj_rest_auth.urls")),
-	path("api/v1/auth/registration/", include("dj_rest_auth.registration.urls")),
-	path(
-		"api/v1/auth/password/reset/confirm/<uidb64>/<token>/",
-		PasswordResetConfirmView.as_view(),
-		name="password_reset_confirm",
-	),
+	# path("api/v1/users/me/", CustomUserDetailsView.as_view(), name="user_details"),
+	path('', include(router.urls)),
 ]
 
 admin.site.site_header = "FoloMoney API Admin"

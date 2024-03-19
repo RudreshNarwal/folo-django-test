@@ -1,0 +1,64 @@
+version: "3.9"
+
+services:
+#    es:
+#        image: elasticsearch:7.17.9
+#        environment:
+#            - discovery.type=single-node
+#        ports:
+#            - "9200:9200"
+#        networks:
+#            - reverseproxy_nw
+    api: &api
+        build:
+            context: .
+            dockerfile: ./docker/production/django/Dockerfile
+        command: /start
+        image: folo_money
+        expose: #expose: Documents the ports that the container uses, making them accessible to other containers within the same Docker network.
+            - "8999"
+        volumes:
+            - static_volume:/app/staticfiles
+            - media_volume:/app/mediafiles
+        env_file:
+            - ./.envs/.production/.django
+        depends_on:
+#            - postgres
+            - redis
+#            - es
+        networks:
+            - reverseproxy_nw
+
+    redis:
+        image: redis:7-alpine
+        networks:
+            - reverseproxy_nw
+
+    celery_worker:
+        <<: *api
+        image: folo_money_celery_worker
+        command: /start-celeryworker
+        networks:
+            - reverseproxy_nw
+
+    flower:
+        <<: *api
+        image: folo_money_flower
+        command: /start-flower
+        ports:
+            - "5555:5555"
+        volumes:
+            - flower_data:/data
+        networks:
+            - reverseproxy_nw
+
+networks:
+    reverseproxy_nw:
+        external: true
+
+volumes:
+    static_volume: {}
+    media_volume: {}
+    production_postgres_data: {}
+    production_postgres_data_backups: {}
+    flower_data: {}

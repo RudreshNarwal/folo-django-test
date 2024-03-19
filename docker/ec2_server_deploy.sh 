@@ -1,0 +1,28 @@
+#!/bin/bash
+
+EC2_IP_ADDRESS="13.246.205.205"
+# Assuming your EC2 IP address is stored in this environment variable
+if [ -z "$EC2_IP_ADDRESS" ]
+then
+  echo "EC2_IP_ADDRESS not defined"
+  exit 0
+fi
+
+# Replace YOUR_PEM_FILE_PATH with the actual path to your PEM file for EC2 SSH access
+PEM_FILE="/Users/rudresh/documents/FoloMoney/pg-mac.pem"
+
+git archive --format tar --output ./project.tar main
+
+echo 'Uploading project.......:-)...Be Patient!'
+# Note the inclusion of -e "ssh -i $PEM_FILE" to specify the PEM file for SSH access
+rsync -e "ssh -i $PEM_FILE -o StrictHostKeyChecking=no" ./project.tar root@$EC2_IP_ADDRESS:/tmp/project.tar
+echo 'Upload complete...:-)'
+
+echo 'Building the image...'
+# Here too, include the PEM file in the SSH command
+ssh -o StrictHostKeyChecking=no -i $PEM_FILE root@$EC2_IP_ADDRESS << 'ENDSSH'
+  mkdir -p /app
+  rm -rf /app/* && tar -xf /tmp/project.tar -C /app
+  docker compose -f /app/production.yml up --build -d --remove-orphans
+ENDSSH
+echo 'Build completed successfully....:-)'

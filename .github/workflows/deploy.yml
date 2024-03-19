@@ -1,0 +1,99 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [dev]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      ENV_BASE64_DJANGO: ${{ secrets.ENV_BASE64_DJANGO }}
+      ENV_BASE64_MAKEFILE: ${{ secrets.ENV_BASE64_MAKEFILE }}
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Decode and create .env files
+        run: |
+          mkdir -p ./.envs/.production/
+          echo "${{ env.ENV_BASE64_DJANGO }}" | base64 --decode > combined.env.django
+          cp combined.env.django ./.envs/.production/.django
+
+      - name: Create Docker Network
+        run: docker network create reverseproxy_nw || true
+
+      - name: Build Docker images
+        run: docker compose -f production.yml up --build -d --remove-orphans
+
+      - name: Debugging - List files in current directory
+        run: ls -lah
+
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            set -e  # Exit on first error
+
+            echo "** Connected to EC2 server **"
+
+            # Ensure Git is installed
+            if ! command -v git &> /dev/null
+            then
+                echo "Git could not be found, installing..."
+                sudo apt-get update && sudo apt-get install git -y
+            fi
+
+            # Check if /app is a valid Git repository
+            if [ -d "/app/.git" ]; then
+              echo "** /app is a Git repository. Fetching latest changes... **"
+              cd /app
+              # Ensure the repository is set to the correct remote and branch
+              git remote set-url origin git@github.com:RudreshNarwal/folo.django.git
+              git fetch origin dev
+              git reset --hard origin/dev
+              git clean -fd
+            else
+              if [ -d "/app" ]; then
+                echo "** /app exists but is not a Git repo. Removing... **"
+                sudo rm -rf /app
+              fi
+              echo "** Creating /app directory... **"
+              sudo mkdir -p /app
+              # Adjust the permission as needed. Example: making the current user the owner
+              # This step assumes the current user has sufficient permissions to do so
+              sudo chown $USER:$USER /app
+              sudo chmod 755 /app
+              echo "** Cloning repository into /app... **"
+              pwd
+              ls -l
+              git clone -b dev git@github.com:RudreshNarwal/folo.django.git /app
+            fi
+
+            cd /app
+            
+            mkdir -p ./.envs/.production/
+            echo "${{ env.ENV_BASE64_DJANGO }}" | base64 --decode > combined.env.django
+            cp combined.env.django ./.envs/.production/.django
+            # Remove the combined.env.django file
+            rm combined.env.django
+
+
+            # Here, include any steps required to prepare the application environment,
+            # such as running migrations, compiling assets, etc.
+            echo "** Building and starting Docker containers... **"
+            sudo docker compose -f production.yml up --build -d --remove-orphans || (echo "** Docker Compose failed! **" && exit 1)
+            
+            ## Creating make file
+            echo "** Removing old Makefile **"
+            sudo rm Makefile
+            echo "** Removed Makefile successfully !! **"
+            
+            echo "** Creating Makefile and Removing old Makefile **"
+            echo "${{ env.ENV_BASE64_MAKEFILE }}" | base64 --decode > testmake
+            cp testmake Makefile
+            rm testmake
+
+            echo "** Deployment completed successfully! **"

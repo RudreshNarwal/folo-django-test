@@ -17,6 +17,7 @@ class UserAdmin(BaseUserAdmin):
 		"pkid",
 		"id",
 		"mobile",
+		"country"
 		"email",
 		"first_name",
 		"last_name",
@@ -49,7 +50,7 @@ class UserAdmin(BaseUserAdmin):
 		None,
 		{
 			"classes": ("wide",),
-			"fields": ("email", "first_name", "mobile", "last_name", "password1", "password2"),
+			"fields": ("email", "first_name", "mobile", "last_name", "password1", "password2", "country", "city", "gender"),
 		},
 	)
 	search_fields = ["email", "mobile", "first_name", "last_name"]

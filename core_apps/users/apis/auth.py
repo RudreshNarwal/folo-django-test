@@ -28,11 +28,15 @@ class AuthView(viewsets.ViewSet):
 
     @action(methods=['POST'], detail=False)
     def send_otp(self, request):
-
+ 
         serializer = RegisterUserMobileSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-
-        user = self.model.objects.filter(mobile=serializer.validated_data.get('mobile')).first()
+        
+        mobile = serializer.validated_data.get('mobile')
+        country_code = serializer.validated_data.get('country_code')
+        
+        # Now, you can use the mobile and country_code variables to look up the user
+        user = self.model.objects.filter(mobile=mobile, country_code=country_code).first()
 
         if user is not None:
             otp = user.send_otp()

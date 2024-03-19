@@ -7,9 +7,10 @@ class VerificationCodeError(Exception):
 
 class GatewayRejectionError(VerificationCodeError):
     """Exception raised when a message is rejected by the gateway."""
-    def __init__(self, message="Message rejected by the gateway in send_verification_code", recipients=None):
+    def __init__(self, message="Message rejected by the gateway in send_verification_code", recipients=None, mobile=None):
         self.message = message
         self.recipients = recipients
+        self.mobile = mobile
         super().__init__(self.message)
 
 def send_verification_code(mobile, code):
@@ -25,11 +26,9 @@ def send_verification_code(mobile, code):
         "Content-Type": "application/x-www-form-urlencoded",
     }
     
-    mobile_numbers=f"+254{mobile}"
-
     data = {
         "username": username,
-        "to": mobile_numbers,
+        "to": mobile,
         "message": message,
         "from": sender_id,
     }
@@ -43,7 +42,7 @@ def send_verification_code(mobile, code):
         recipients = response_data.get("SMSMessageData", {}).get("Recipients", [])
         if any((recipient.get("statusCode") == 502 or recipient.get("statusCode") == 403) for recipient in recipients):
             # Handle the specific error (e.g., RejectedByGateway with statusCode 502)
-            raise GatewayRejectionError(recipients=recipients)
+            raise GatewayRejectionError(recipients=recipients, mobile=mobile)
         return response_data  # Return the successful response data
     
     except ValueError:

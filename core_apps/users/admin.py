@@ -17,7 +17,6 @@ class UserAdmin(BaseUserAdmin):
 		"pkid",
 		"id",
 		"mobile",
-		"country"
 		"email",
 		"first_name",
 		"last_name",

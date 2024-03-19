@@ -16,7 +16,7 @@ def send_verification_code(mobile, code):
     api_url = "https://api.africastalking.com/version1/messaging"
     api_key = "dfb804d5dfe09d5d1f4bd5da2be97ed3e8d1e357fd64c54a40e918d253c66d92"
     username = "folomoney"
-    sender_id = "Folo"
+    sender_id = "FOLO"
     message = f"Your Folo verification code is: {code}"
 
     headers = {

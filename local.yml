@@ -16,39 +16,8 @@ services:
 #            - "8009:8009"
         env_file:
             - ./.envs/.local/.django
-            - ./.envs/.local/.postgres
         depends_on:
-            - postgres
             - mailhog
-#            - redis
-#            - es
-        networks:
-            - folo-api
-
-    postgres:
-        build:
-            context: .
-            dockerfile: ./docker/local/postgres/Dockerfile
-        expose:
-            - "5432"
-        ports:
-            - "5432:5432"
-        volumes:
-            - local_postgres_data:/var/lib/postgresql/data
-            - local_postgres_data_backups:/backups
-        env_file:
-            - ./.envs/.local/.postgres
-        networks:
-            - folo-api
-
-    pgadmin:
-        image: dpage/pgadmin4
-        env_file:
-            - ./.envs/.local/.pgadmin
-        ports:
-            - "5050:5050"
-        depends_on:
-            - postgres
         networks:
             - folo-api
 
@@ -76,10 +45,8 @@ services:
             - .:/app
         env_file:
             - ./.envs/.local/.django
-            - ./.envs/.local/.postgres
         depends_on:
             - redis
-            - postgres
             - mailhog
         networks:
             - folo-api
@@ -93,12 +60,10 @@ services:
             - flower_data:/data
         env_file:
             - ./.envs/.local/.django
-            - ./.envs/.local/.postgres
         ports:
             - "5555:5555"
         depends_on:
             - redis
-            - postgres
         networks:
             - folo-api
 
@@ -122,8 +87,6 @@ networks:
         driver: bridge
 
 volumes:
-    local_postgres_data: {}
-    local_postgres_data_backups: {}
     static_volume:
     media_volume:
     flower_data:

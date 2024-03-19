@@ -80,12 +80,6 @@ jobs:
             # Remove the combined.env.django file
             rm combined.env.django
 
-
-            # Here, include any steps required to prepare the application environment,
-            # such as running migrations, compiling assets, etc.
-            echo "** Building and starting Docker containers... **"
-            sudo docker compose -f production.yml up --build -d --remove-orphans || (echo "** Docker Compose failed! **" && exit 1)
-            
             ## Creating make file
             echo "** Removing old Makefile **"
             sudo rm Makefile
@@ -95,5 +89,11 @@ jobs:
             echo "${{ env.ENV_BASE64_MAKEFILE }}" | base64 --decode > testmake
             cp testmake Makefile
             rm testmake
+
+            # Here, include any steps required to prepare the application environment,
+            # such as running migrations, compiling assets, etc.
+            echo "** Building and starting Docker containers... **"
+            sudo make down
+            sudo docker compose -f production.yml up --build -d --remove-orphans || (echo "** Docker Compose failed! **" && exit 1)
 
             echo "** Deployment completed successfully! **"

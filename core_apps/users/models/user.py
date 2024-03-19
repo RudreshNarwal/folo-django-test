@@ -164,28 +164,3 @@ class User(AbstractBaseUser, GenericModel, PermissionsMixin):
 				otp_obj.save()
 				is_verified = True
 		return is_verified
-
-# class UserManager(BaseUserManager):
-#     use_in_migrations = True
-#
-#     def create_user(self, mobile, password=None):
-#         if not mobile:
-#             raise ValueError('Users must have an mobile number')
-#
-#         user = self.model(
-#             mobile=mobile
-#         )
-#         user.set_password(password)
-#         user.save(using=self._db)
-#         return user
-#
-#     def create_superuser(self, mobile, password=None):
-#         user = self.create_user(
-#             mobile, password
-#         )
-#         user.is_admin = True
-#         user.is_staff = True
-#         user.is_superuser = True
-#         user.is_active = True
-#         user.save(using=self._db)
-#         return user

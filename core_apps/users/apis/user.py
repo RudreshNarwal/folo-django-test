@@ -23,7 +23,6 @@ class IsOwnerOrReadOnly(IsAuthenticated):
         # Read permissions are allowed to any request, so we'll always allow GET, HEAD or OPTIONS requests.
         # if request.method in ('GET', 'HEAD', 'OPTIONS'):
         #     return True
-        
         # Write permissions are only allowed to the owner of the user profile.
         return obj == request.user
 
@@ -63,26 +62,23 @@ class UserViewSet(viewsets.ModelViewSet):
         serializer = UserSerializer(instance=user)
         return response.Response(serializer.data)
     
-    @action(detail=False, methods=['post'], permission_classes=[AllowAny])
-    def register(self, request):
-        serializer = UserSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        
-        mobile = serializer.validated_data.get('mobile')
-        
-        if mobile and User.objects.filter(mobile=mobile).exists():
+    @action(detail=False, methods=['post'])
+    def register(self, request, *args, **kwargs):
+        # Check if the user already exists
+        if request.user.email is not None:
             return response.Response({
                 "message": "User already registered."
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        if serializer.is_valid():
-            user = serializer.save()
-            return response.Response({
-                "user": UserSerializer(user).data,
-                "message": "User successfully registered."
-            }, status=status.HTTP_201_CREATED)
-        else:
-            return response.Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer = self.get_serializer(request.user, data=request.data, partial=kwargs.pop('partial', True))
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        
+        # Return the newly registered user's data
+        return response.Response({
+            "user": serializer.data,
+            "message": "User successfully registered."
+        }, status=status.HTTP_201_CREATED)
     
     def update(self, request, *args, **kwargs):
         # Disable the partial update (PUT) action.
@@ -96,51 +92,5 @@ class UserViewSet(viewsets.ModelViewSet):
         #Disable the destroy (DELETE) action.
         return Response({'message': 'DELETE method is not allowed.'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
 
-class UserView(viewsets.ViewSet):
-    model = User
-    permission_classes = (IsAuthenticated,)
-    serializer_class = UserSerializer
-    
-    # def get_object(self):
-    #     return self.request.user
-    # def get_queryset(self):
-    #     return self.model.objects.all()
-    
-    @action(methods=['GET'], detail=False)
-    def me(self, request):
-        user = request.user
-        # user = self.get_queryset().filter().first()
-        serializer = UserSerializer(instance=user)
-        return response.Response(serializer.data)
-    
-    @action(detail=False, methods=['post'], permission_classes=[AllowAny])
-    def register(self, request):
-        serializer = UserSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        
-        mobile = serializer.validated_data.get('mobile')
-        
-        if mobile and User.objects.filter(mobile=mobile).exists():
-            return response.Response({
-                "message": "User already registered."
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        if serializer.is_valid():
-            user = serializer.save()
-            return response.Response({
-                "user": UserSerializer(user).data,
-                "message": "User successfully registered."
-            }, status=status.HTTP_201_CREATED)
-        else:
-            return response.Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-# class CustomUserDetailsView(RetrieveUpdateAPIView):
-#     serializer_class = UserSerializer
-#     permission_classes = (IsAuthenticated,)
-#     model = User
-#
-#     def get_object(self):
-#         return self.request.user
-#
-#     def get_queryset(self):
-#         return self.model.objects.all().filter().first()
+

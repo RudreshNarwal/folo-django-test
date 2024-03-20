@@ -8,6 +8,7 @@ from rest_framework import permissions
 from rest_framework.routers import DefaultRouter
 
 from core_apps.users.apis import user, auth
+from core_apps.transunion.views import CreditReportViewSet
 # from core_apps.users.views import CustomUserDetailsView
 from dj_rest_auth.views import PasswordResetConfirmView
 
@@ -27,6 +28,7 @@ router = DefaultRouter()
 
 router.register(r'api/v1/auth', auth.AuthView, basename='auth')
 router.register(r'api/v1/users', user.UserViewSet, basename='users')
+router.register(r'api/v1/tu', CreditReportViewSet, basename='tu')
 
 urlpatterns = [
 	path("redoc/", schema_view.with_ui("redoc", cache_timeout=0)),

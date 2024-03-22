@@ -8,6 +8,11 @@ class GenericModel(models.Model):
     created_on = models.DateTimeField(
         auto_now_add=True
     )
+    
+    updated_on = models.DateTimeField(
+        auto_now=True,
+        db_index=True
+    )
 
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -15,11 +20,6 @@ class GenericModel(models.Model):
         related_name='+',
         null=True,
         blank=True
-    )
-
-    updated_on = models.DateTimeField(
-        auto_now=True,
-        db_index=True
     )
 
     updated_by = models.ForeignKey(

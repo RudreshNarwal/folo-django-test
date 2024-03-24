@@ -1,14 +1,10 @@
 import base64
-
 from celery import shared_task
 import requests
-import json
-from django.utils.timezone import now
-from datetime import timedelta
 from django.conf import settings
-
 from .models import Transaction
-from .services import get_access_token
+from .services.mpesa import get_access_token
+from .services.subscription import create_subscription
 
 
 @shared_task
@@ -16,21 +12,20 @@ def query_payment_status(transaction_id):
 	try:
 		transaction = Transaction.objects.get(pk=transaction_id)
 		
-		# Ensure that we only query status for transactions where a callback has not been successful
+		# Only query status for transactions that haven't received a final callback
 		if transaction.status not in ['Successful', 'Failed']:
 			access_token, error = get_access_token()
 			
 			if error:
-				# Trigger EMAIL to OPS TODO
-			    pass
-
+				# Implement error handling or logging here
+				# Example: logging.error(f"Error getting access token: {error}")
+				return
 			
 			headers = {
 				'Authorization': f'Bearer {access_token}',
 				'Content-Type': 'application/json',
 			}
 			
-			# Assuming you have a way to generate these dynamically or retrieve from transaction
 			business_short_code = settings.MPESA_BUSINESS_CODE
 			passkey = settings.MPESA_PASSKEY
 			timestamp = transaction.mpesa_timestamp
@@ -47,13 +42,14 @@ def query_payment_status(transaction_id):
 			response = requests.post('https://sandbox.safaricom.co.ke/mpesa/stkpushquery/v1/query', json=data, headers=headers)
 			if response.status_code == 200:
 				response_data = response.json()
-				# Update transaction status based on the response
 				transaction.response = {"from": "Status Api", **response_data}
-				transaction.status = 'Successful' if response_data.get("ResponseCode") == "0" else 'Failed'
+				if response_data.get("ResultCode") == 0:
+					transaction.status = 'Successful'
+					if transaction.plan and transaction.plan.type == 'subscription':
+						create_subscription(transaction)
+				else:
+					transaction.status = 'Failed'
 				transaction.save()
-			else:
-				# Handle unsuccessful API call
-				pass
 	except Transaction.DoesNotExist:
-		# Handle the case where the transaction does not exist
+		# Implement logging or error handling for transaction not found
 		pass

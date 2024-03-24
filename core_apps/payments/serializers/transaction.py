@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Transaction
+from ..models import Transaction
 
 class TransactionCreateSerializer(serializers.ModelSerializer):
     amount = serializers.DecimalField(max_digits=10, decimal_places=2, required=True)

@@ -5,13 +5,12 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_POST
 
-from .models import Transaction
-from .serializers import TransactionCreateSerializer, TransactionSerializer
-from .services import get_access_token, make_stk_push_request
-from .tasks import query_payment_status
+from core_apps.payments.models import Transaction
+from ..serializers.transaction import TransactionSerializer, TransactionCreateSerializer
+from core_apps.payments.services.mpesa import get_access_token, make_stk_push_request
+from core_apps.payments.services.subscription import create_subscription
+from core_apps.payments.tasks import query_payment_status
 
 
 class TransactionDetailView(APIView):
@@ -105,6 +104,10 @@ class MpesaCallbackAPIView(APIView):
                         if item.get('Name') == 'MpesaReceiptNumber':
                             transaction.mpesa_receipt_number = item.get('Value')
                             break
+                            
+                    # New: Check if the plan is a subscription and create a subscription
+                    if transaction.plan and transaction.plan.type == 'subscription':
+                        create_subscription(transaction)
     
                 # Save the whole response for record-keeping regardless of success or failure
                 transaction.response = callback_data
@@ -116,3 +119,4 @@ class MpesaCallbackAPIView(APIView):
     
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+    

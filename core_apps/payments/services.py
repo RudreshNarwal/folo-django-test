@@ -11,7 +11,6 @@ def get_access_token():
             'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials',
             headers={
                 'Authorization': f'Basic {settings.MPESA_CLIENT_TOKEN}',
-                # 'Cookie': 'incap_ses_738_2742146=aL8EZxbvOW8ZueHJvug9Cm4A/2UAAAAAYd250UHuQFyc8bkoS6NRUw==; incap_ses_747_2742146=n+V+BxGFcgHADE5CAuddChhO/WUAAAAAIJlMEXtn573UOo0xPj/afg==; visid_incap_2742146=pzQd1+2zRoirtUF7P0eFseSW+mUAAAAAQUIPAAAAAABexnxFkk9ZhIoQs6P5N+5J'
             }
         )
         response.raise_for_status()  # Raises an HTTPError if the response code was unsuccessful

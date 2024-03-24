@@ -39,6 +39,7 @@ class InitiateTransactionAPIView(APIView):
                 status='Initiated'
             )
             
+            # Celery task
             transaction_id = transaction.pkid
             # Schedule the task to run after 180 seconds
             query_payment_status.apply_async((transaction_id,), countdown=180)
@@ -64,7 +65,7 @@ class InitiateTransactionAPIView(APIView):
             transaction.mpesa_merchant_request_id = stk_response["merchant_request_id"]
             transaction.mpesa_checkout_request_id = stk_response["checkout_request_id"]
             transaction.mpesa_timestamp = stk_response["timestamp"]
-            if stk_response["status"] is "Failed":
+            if stk_response["status"] == "Failed":
                 transaction.response = stk_response["response_body"]
             transaction.save()
             

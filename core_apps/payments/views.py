@@ -1,10 +1,30 @@
+import json
+
 from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
+
 from .models import Transaction
-from .serializers import TransactionCreateSerializer
-from .services import get_access_token
+from .serializers import TransactionCreateSerializer, TransactionSerializer
+from .services import get_access_token, make_stk_push_request
+
+
+
+class TransactionDetailView(APIView):
+    permission_classes = [IsAuthenticated]  # Ensure the user is authenticated
+
+    def get(self, request, transaction_id):
+        try:
+            # Ensuring: transaction belongs to the request.user
+            transaction = Transaction.objects.get(pk=transaction_id, user=request.user)
+            serializer = TransactionSerializer(transaction)
+            return Response(serializer.data)
+        except Transaction.DoesNotExist:
+            return Response({'message': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
 
 
 class InitiateTransactionAPIView(APIView):
@@ -25,12 +45,69 @@ class InitiateTransactionAPIView(APIView):
                 transaction.status = 'Failed'
                 transaction.response = {"error": error}
                 transaction.save(update_fields=['status', 'response'])
-                return Response({"error": "Failed to retrieve access token", "details": str(error)},
+                return Response({"message": "Failed to retrieve access token", "details": str(error)},
                                 status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             
+            stk_response, error = make_stk_push_request(access_token, transaction)
+            if error:
+                transaction.status = 'Failed'
+                transaction.response = {"error": error}
+                transaction.save(update_fields=['status', 'response'])
+                return Response({"message": "Failed to retrieve access token", "details": str(error)},
+                                status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            transaction.status = stk_response["status"]
+            transaction.mpesa_merchant_request_id = stk_response["merchant_request_id"]
+            transaction.mpesa_checkout_request_id = stk_response["checkout_request_id"]
+            transaction.mpesa_timestamp = stk_response["timestamp"]
+            if stk_response["status"] is "Failed":
+                transaction.response = stk_response["response_body"]
+            transaction.save()
+            
             return Response(
-                {"message": "Transaction initiated successfully.", "transaction_id": transaction.id, "access_token": access_token},
+                {"message": "Transaction initiated successfully.", "transaction_id": transaction.id},
                 status=status.HTTP_201_CREATED)
             
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class MpesaCallbackAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        try:
+            callback_data = json.loads(request.body)
+            body = callback_data.get('Body', {})
+            stk_callback = body.get('stkCallback', {})
+            merchant_request_id = stk_callback.get('MerchantRequestID')
+            checkout_request_id = stk_callback.get('CheckoutRequestID')
+            result_code = stk_callback.get('ResultCode')
+    
+            # Find the transaction by MerchantRequestID and CheckoutRequestID
+            transaction = Transaction.objects.filter(
+                mpesa_merchant_request_id=merchant_request_id,
+                mpesa_checkout_request_id=checkout_request_id
+            ).first()
+    
+            if transaction:
+                # Update transaction status based on ResultCode
+                transaction.status = 'Successful' if result_code == 0 else 'Failed'
+                if result_code == 0:
+                    # Process success callback to get MpesaReceiptNumber
+                    callback_metadata = stk_callback.get('CallbackMetadata', {})
+                    for item in callback_metadata.get('Item', []):
+                        if item.get('Name') == 'MpesaReceiptNumber':
+                            transaction.mpesa_receipt_number = item.get('Value')
+                            break
+    
+                # Save the whole response for record-keeping regardless of success or failure
+                transaction.response = callback_data
+                transaction.save()
+    
+                return JsonResponse({'status': 'success', 'message': 'Callback processed successfully'})
+            else:
+                return JsonResponse({'status': 'error', 'message': 'Transaction not found'}, status=404)
+    
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)

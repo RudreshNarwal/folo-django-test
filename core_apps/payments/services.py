@@ -1,4 +1,8 @@
+import base64
 import requests
+from datetime import datetime
+
+from django.conf import settings
 
 def get_access_token():
     """Function to call the external service and get an access token."""
@@ -6,7 +10,7 @@ def get_access_token():
         response = requests.get(
             'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials',
             headers={
-                'Authorization': 'Basic dWt3eUZ3M0VUR283ak54UWlWQ1lBdzc2WEdMRzZLQ0I6UVBCN0VkSlNvaEd6d3FpWQ==',
+                'Authorization': f'Basic {settings.MPESA_CLIENT_TOKEN}',
                 # 'Cookie': 'incap_ses_738_2742146=aL8EZxbvOW8ZueHJvug9Cm4A/2UAAAAAYd250UHuQFyc8bkoS6NRUw==; incap_ses_747_2742146=n+V+BxGFcgHADE5CAuddChhO/WUAAAAAIJlMEXtn573UOo0xPj/afg==; visid_incap_2742146=pzQd1+2zRoirtUF7P0eFseSW+mUAAAAAQUIPAAAAAABexnxFkk9ZhIoQs6P5N+5J'
             }
         )
@@ -15,3 +19,53 @@ def get_access_token():
     except requests.exceptions.RequestException as e:
         # Return None and the error
         return None, e
+
+
+def make_stk_push_request(access_token, transaction):
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Content-Type': 'application/json',
+    }
+    
+    # Generate the timestamp and password as per M-PESA API requirements
+    timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+    business_short_code = settings.MPESA_BUSINESS_CODE
+    passkey = settings.MPESA_PASSKEY
+    password = base64.b64encode(f"{business_short_code}{passkey}{timestamp}".encode()).decode('utf-8')
+    callback_url = f"{settings.BASE_URL}/api/v1/mpesa/callback/"  # Replace with your callback URL
+    
+    data = {
+        "BusinessShortCode": business_short_code,
+        "Password": password,
+        "Timestamp": timestamp,
+        "TransactionType": "CustomerPayBillOnline",
+        "Amount": str(transaction.amount),
+        "PartyA": "600995",  # Your business's party number
+        "PartyB": business_short_code,
+        "PhoneNumber": transaction.user.get_mobile_without_plus(),  # Assuming user model has a phone_number field
+        "CallBackURL": callback_url,
+        "AccountReference": "FOLO MONEY",
+        "TransactionDesc": "Credit Report Subscription"
+    }
+    
+    response = requests.post('https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest', json=data, headers=headers)
+    
+    if response.status_code == 200:
+        response_body = response.json()
+        if response_body.get("ResponseCode") == "0":
+            return {
+                "merchant_request_id": response_body.get("MerchantRequestID"),
+                "checkout_request_id": response_body.get("CheckoutRequestID"),
+                "timestamp": timestamp,
+                "status": "Pending"
+            }, None
+        else:
+            return {
+                "merchant_request_id": response_body.get("MerchantRequestID"),
+                "checkout_request_id": response_body.get("CheckoutRequestID"),
+                "status": "Failed",
+                "timestamp": timestamp,
+                "response_body": response_body
+            }, None
+    return None, response.text
+

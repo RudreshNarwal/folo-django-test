@@ -67,13 +67,15 @@ class Transaction(GenericModel):
 	STATUS_CHOICES = (
 		('initiated', 'Initiated'),
 		('pending', 'Pending'),
-		('completed', 'Completed'),
+		('successful', 'Successful'),
 		('failed', 'Failed'),
 	)
 	status = models.CharField(max_length=20, choices=STATUS_CHOICES, db_index=True)
 	response = models.JSONField(null=True, blank=True)  # Store transaction response JSON
-	mpesa_merchant_request_id = models.CharField(max_length=255, null=True, blank=True)
-	mpesa_checkout_request_id = models.CharField(max_length=255, null=True, blank=True)
+	mpesa_merchant_request_id = models.CharField(max_length=255, null=True, blank=True, db_index=True)
+	mpesa_checkout_request_id = models.CharField(max_length=255, null=True, blank=True, db_index=True)
+	mpesa_receipt_number = models.CharField(max_length=255, null=True, blank=True)
+	mpesa_timestamp = models.CharField(max_length=14, blank=True, null=True)
 	
 	def __str__(self):
 		return f"Transaction {self.id} - {self.status}"

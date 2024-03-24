@@ -7,7 +7,7 @@ from drf_yasg.views import get_schema_view
 from rest_framework import permissions
 from rest_framework.routers import DefaultRouter
 
-from core_apps.payments.views import InitiateTransactionAPIView
+from core_apps.payments.views import InitiateTransactionAPIView, MpesaCallbackAPIView, TransactionDetailView
 from core_apps.users.apis import user, auth
 from core_apps.transunion.views import CreditReportViewSet
 # from core_apps.users.views import CustomUserDetailsView
@@ -36,7 +36,10 @@ urlpatterns = [
 	path(settings.ADMIN_URL, admin.site.urls),
 	# path("api/v1/users/me/", CustomUserDetailsView.as_view(), name="user_details"),
 	path('', include(router.urls)),
+    path('api/v1/transaction/<int:transaction_id>/', TransactionDetailView.as_view(), name='transaction-detail'),
     path('api/v1/initiate-transaction/', InitiateTransactionAPIView.as_view(), name='initiate-transaction'),
+    path('api/v1/mpesa/callback/', MpesaCallbackAPIView.as_view(), name='mpesa_callback'),
+
 ]
 
 admin.site.site_header = "FoloMoney API Admin"

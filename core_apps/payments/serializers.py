@@ -11,3 +11,8 @@ class TransactionCreateSerializer(serializers.ModelSerializer):
             'plan_id': {'required': True},
             'payment_method_id': {'required': True},
         }
+
+class TransactionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Transaction
+        fields = '__all__'

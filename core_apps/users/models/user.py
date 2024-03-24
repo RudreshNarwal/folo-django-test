@@ -136,7 +136,7 @@ class User(AbstractBaseUser, GenericModel, PermissionsMixin):
 	
 	@property
 	def get_mobile_without_plus(self):
-		return f"{self.country_code.title().replace('+','')}{self.mobile.title()}"
+		return f"{self.country_code.replace('+','').title()}{self.mobile.title()}"
 	
 	@property
 	def get_short_name(self):

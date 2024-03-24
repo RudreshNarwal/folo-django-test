@@ -6,10 +6,10 @@ class TransactionCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Transaction
-        fields = ['plan_id', 'payment_method_id', 'amount']
+        fields = ['plan', 'payment_method', 'amount']
         extra_kwargs = {
-            'plan_id': {'required': True},
-            'payment_method_id': {'required': True},
+            'plan': {'required': True, 'write_only': True},
+            'payment_method': {'required': True, 'write_only': True},
         }
 
 class TransactionSerializer(serializers.ModelSerializer):

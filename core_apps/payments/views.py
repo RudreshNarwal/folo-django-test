@@ -11,7 +11,7 @@ from django.views.decorators.http import require_POST
 from .models import Transaction
 from .serializers import TransactionCreateSerializer, TransactionSerializer
 from .services import get_access_token, make_stk_push_request
-
+from .tasks import query_payment_status
 
 
 class TransactionDetailView(APIView):
@@ -39,6 +39,10 @@ class InitiateTransactionAPIView(APIView):
                 status='Initiated'
             )
             
+            transaction_id = transaction.pkid
+            # Schedule the task to run after 180 seconds
+            query_payment_status.apply_async((transaction_id,), countdown=180)
+            
             # Use the utility function to get the access token
             access_token, error = get_access_token()
             if error:
@@ -65,7 +69,7 @@ class InitiateTransactionAPIView(APIView):
             transaction.save()
             
             return Response(
-                {"message": "Transaction initiated successfully.", "transaction_id": transaction.id},
+                {"message": "Transaction initiated successfully.", "transaction_id": transaction.pkid},
                 status=status.HTTP_201_CREATED)
             
         else:

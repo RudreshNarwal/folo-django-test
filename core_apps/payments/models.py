@@ -56,7 +56,7 @@ class PaymentMethod(GenericModel):
 
 
 class Transaction(GenericModel):
-	pkid = models.BigAutoField(primary_key=True, editable=False)  # pseudo primary key
+	pkid = models.BigAutoField(primary_key=True, editable=False, db_index=True)  # pseudo primary key
 	id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
 	user = models.ForeignKey(User, on_delete=models.CASCADE, db_index=True)
 	plan = models.ForeignKey(Plan, on_delete=models.PROTECT, null=True, blank=True)
@@ -79,6 +79,9 @@ class Transaction(GenericModel):
 	
 	def __str__(self):
 		return f"Transaction {self.id} - {self.status}"
+	
+	def get_amount_as_int(self):
+		return str(int(self.amount))
 	
 	def save(self, *args, **kwargs):
 		# Prefill the 'type' field with the plan name if a plan is associated with the transaction

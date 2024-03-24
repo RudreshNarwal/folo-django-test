@@ -39,10 +39,10 @@ def make_stk_push_request(access_token, transaction):
         "Password": password,
         "Timestamp": timestamp,
         "TransactionType": "CustomerPayBillOnline",
-        "Amount": str(transaction.amount),
-        "PartyA": "600995",  # Your business's party number
+        "Amount": transaction.get_amount_as_int(),
+        "PartyA": transaction.user.get_mobile_without_plus,  # Your business's party number
         "PartyB": business_short_code,
-        "PhoneNumber": transaction.user.get_mobile_without_plus(),  # Assuming user model has a phone_number field
+        "PhoneNumber": transaction.user.get_mobile_without_plus,  # Assuming user model has a phone_number field
         "CallBackURL": callback_url,
         "AccountReference": "FOLO MONEY",
         "TransactionDesc": "Credit Report Subscription"

@@ -96,7 +96,7 @@ class MpesaCallbackAPIView(APIView):
     
             if transaction:
                 # Update transaction status based on ResultCode
-                transaction.status = 'Successful' if result_code == 0 else 'Failed'
+                transaction.status = 'Successful' if result_code == "0" else 'Failed'
                 if result_code == 0:
                     # Process success callback to get MpesaReceiptNumber
                     callback_metadata = stk_callback.get('CallbackMetadata', {})

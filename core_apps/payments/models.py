@@ -29,14 +29,15 @@ class Plan(GenericModel):
 
 class Subscription(models.Model):
 	id = models.BigAutoField(primary_key=True)
-	user = models.ForeignKey(User, on_delete=models.CASCADE)
-	plan = models.ForeignKey(Plan, on_delete=models.CASCADE)
+	user = models.ForeignKey(User, on_delete=models.PROTECT)
+	plan = models.ForeignKey(Plan, on_delete=models.PROTECT)
 	start_date = models.DateField()
 	end_date = models.DateField()
 	is_active = models.BooleanField(default=True)
 	autopay = models.BooleanField(default=False)  # Autopay option
 	created_at = models.DateTimeField(auto_now_add=True)
 	updated_at = models.DateTimeField(auto_now=True)
+	transaction = models.ForeignKey('Transaction', on_delete=models.SET_NULL, null=True, blank=True, related_name='subscriptions')
 	
 	def __str__(self):
 		return f"{self.user.mobile} - {self.plan.name}"
@@ -58,9 +59,9 @@ class PaymentMethod(GenericModel):
 class Transaction(GenericModel):
 	pkid = models.BigAutoField(primary_key=True, editable=False, db_index=True)  # pseudo primary key
 	id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
-	user = models.ForeignKey(User, on_delete=models.CASCADE, db_index=True)
+	user = models.ForeignKey(User, on_delete=models.PROTECT, db_index=True)
 	plan = models.ForeignKey(Plan, on_delete=models.PROTECT, null=True, blank=True)
-	subscription = models.ForeignKey(Subscription, on_delete=models.PROTECT, null=True, blank=True)
+	subscription = models.ForeignKey(Subscription, on_delete=models.PROTECT, null=True, blank=True, related_name='payment_transactions')
 	payment_method = models.ForeignKey(PaymentMethod, on_delete=models.PROTECT, null=True, blank=True)
 	type = models.CharField(max_length=30, db_index=True)  # Could refine this with choices if needed
 	amount = models.DecimalField(max_digits=10, decimal_places=2)

@@ -41,7 +41,7 @@ class InitiateTransactionAPIView(APIView):
             # Celery task
             transaction_id = transaction.pkid
             # Schedule the task to run after 180 seconds
-            query_payment_status.apply_async((transaction_id,), countdown=180)
+            query_payment_status.apply_async((transaction_id,), countdown=130)
             
             # Use the utility function to get the access token
             access_token, error = get_access_token()
@@ -106,7 +106,11 @@ class MpesaCallbackAPIView(APIView):
                             break
                             
                     # New: Check if the plan is a subscription and create a subscription
+                    print('Callback:')
+                    print(transaction.plan)
+                    print(transaction.plan.type)
                     if transaction.plan and transaction.plan.type == 'subscription':
+                        print('In IF')
                         create_subscription(transaction)
     
                 # Save the whole response for record-keeping regardless of success or failure

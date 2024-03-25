@@ -45,7 +45,12 @@ def query_payment_status(transaction_id):
 				transaction.response = {"from": "Status Api", **response_data}
 				if str(response_data.get("ResultCode")) == "0":
 					transaction.status = 'Successful'
+					print('1:')
+					print(transaction.plan)
+					print(transaction.plan.type)
+					print(transaction.plan and transaction.plan.type == 'subscription')
 					if transaction.plan and transaction.plan.type == 'subscription':
+						print('In IF')
 						create_subscription(transaction)
 				else:
 					transaction.status = 'Failed'

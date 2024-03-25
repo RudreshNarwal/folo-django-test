@@ -94,6 +94,6 @@ jobs:
             # such as running migrations, compiling assets, etc.
             echo "** Building and starting Docker containers... **"
             sudo make down
-            sudo make up || (echo "** Docker Compose failed! **" && exit 1)
+            sudo make build || (echo "** Docker Compose failed! **" && exit 1)
 
             echo "** Deployment completed successfully! **"

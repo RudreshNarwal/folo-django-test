@@ -96,8 +96,8 @@ class MpesaCallbackAPIView(APIView):
     
             if transaction:
                 # Update transaction status based on ResultCode
-                transaction.status = 'Successful' if result_code == "0" else 'Failed'
-                if result_code == 0:
+                transaction.status = 'Successful' if str(result_code) == "0" else 'Failed'
+                if str(result_code) == "0":
                     # Process success callback to get MpesaReceiptNumber
                     callback_metadata = stk_callback.get('CallbackMetadata', {})
                     for item in callback_metadata.get('Item', []):
@@ -106,11 +106,7 @@ class MpesaCallbackAPIView(APIView):
                             break
                             
                     # New: Check if the plan is a subscription and create a subscription
-                    print('Callback:')
-                    print(transaction.plan)
-                    print(transaction.plan.type)
-                    if transaction.plan and transaction.plan.type == 'subscription':
-                        print('In IF')
+                    if transaction.plan and transaction.plan.type == 'Subscription':
                         create_subscription(transaction)
     
                 # Save the whole response for record-keeping regardless of success or failure

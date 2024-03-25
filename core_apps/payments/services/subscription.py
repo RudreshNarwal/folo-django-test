@@ -3,7 +3,7 @@ from django.utils.timezone import now, timedelta
 from core_apps.payments.models import Subscription
 
 
-def create_subscription(self, transaction):
+def create_subscription(transaction):
 	# Determine subscription duration
 	duration_days = transaction.plan.duration_days or 30  # Default to 30 days
 	

@@ -40,7 +40,6 @@ class AuthView(viewsets.ViewSet):
 
         if user is not None:
             otp = user.send_otp()
-            print(user.email)
             return Response({
                 "is_registered": user.email is not None,
                 "message": "Otp sent successfully !!"

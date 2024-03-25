@@ -37,6 +37,7 @@ class Subscription(models.Model):
 	autopay = models.BooleanField(default=False)  # Autopay option
 	created_at = models.DateTimeField(auto_now_add=True)
 	updated_at = models.DateTimeField(auto_now=True)
+	amount_paid = models.DecimalField(max_digits=10, decimal_places=2)
 	transaction = models.ForeignKey('Transaction', on_delete=models.SET_NULL, null=True, blank=True, related_name='subscriptions')
 	
 	def __str__(self):

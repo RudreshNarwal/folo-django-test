@@ -1,4 +1,7 @@
+from datetime import timedelta
+
 from django.http import JsonResponse
+from django.utils.timezone import now
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -10,126 +13,62 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 
 from .models import CreditReport
-from .serializers import CreditReportSerializer
 from . import services
 
+
 class CreditReportViewSet(viewsets.ModelViewSet):
-    serializer_class = CreditReportSerializer
-    permission_classes = [IsAuthenticated]
-    
-    # def get_queryset(self):
-	#     # Return only the reports belonging to the current user
-	#     return CreditReport.objects.filter(user=self.request.user)
-    #
-    # def perform_create(self, serializer):
-    #     # Custom logic before saving can go here
-    #     super().perform_create(serializer)
-    #     # Custom logic after saving can go here
-    
-    @action(detail=False, methods=['post'])
-    def register(self, request, *args, **kwargs):
-	    serializer = CreditReportSerializer(data=request.data)
-	    if serializer.is_valid():
-		    # Use the validated data
-		    api_response = services.register_with_tu(serializer.validated_data)
-		    
-		    # Assuming `api_response` is a dictionary that includes a responseCode.
-		    if api_response.get("responseCode") == 200:
-			    # You can create your CreditReport object here with the serializer.validated_data
-			    # Example:
-			    # CreditReport.objects.create(**serializer.validated_data)
-			    return Response(api_response, status=status.HTTP_200_OK)
-		    else:
-			    return Response(api_response, status=status.HTTP_400_BAD_REQUEST)
-	    else:
-		    # Return serializer errors if validation fails
-		    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    @action(detail=True, methods=['post'])
-    def check_credit_risk(self, request, pk=None):
-	    # Convert QueryDict to dictionary
-	    data = request.data
-	    # Call your service layer
-	    api_response = services.fetch_credit_risk_score(data)
-	    CreditReport.objects.update()
-	    return Response(api_response, status=status.HTTP_200_OK if api_response.get("responseCode") == 200 else status.HTTP_400_BAD_REQUEST)
-    
-    @action(detail=True, methods=['post'])
-    def check_total_outstanding_loan(self, request, pk=None):
-	    data = request.data.copy()
-	    api_response = services.fetch_total_outstanding_loan(data)
-	    
-	    CreditReport.objects.update()
-	    return Response(api_response, status=status.HTTP_200_OK if api_response.get("responseCode") == 200 else status.HTTP_400_BAD_REQUEST)
-    
-    
-    @action(detail=True, methods=['post'])
-    def email_credit_report(self, request, pk=None):
-	    data = request.data.copy()
-	    api_response = services.send_email_creditview_report(data)
-	    
-	    return Response(api_response, status=status.HTTP_200_OK if api_response.get("responseCode") == 200 else status.HTTP_400_BAD_REQUEST)
-
-
-# Adapt your EmailCreditViewReportView.post logic here
-	    
-	    
-
-class RegisterView(APIView):
-	def post(self, request, *args, **kwargs):
-		serializer = CreditReportSerializer(data=request.data)
-		if serializer.is_valid():
-			# Use the validated data
-			api_response = services.register_with_tu(serializer.validated_data)
+	permission_classes = [IsAuthenticated]
+	
+	@action(detail=False, methods=['post'])
+	def register(self, request, *args, **kwargs):
+		# Check if the user is already registered
+		if CreditReport.objects.filter(user=request.user, is_registered=True).exists():
+			return Response({"message": "User is already registered."}, status=status.HTTP_400_BAD_REQUEST)
+		
+		api_response = services.register_with_tu(request.user)
+		response_code = api_response.get("responseCode")
+		if 200 <= response_code < 300:
+			return Response(api_response, status=status.HTTP_200_OK)
+		else:
+			return Response(api_response, status=status.HTTP_400_BAD_REQUEST)
+	
+	@action(detail=False, methods=['get'])
+	def check_credit_risk(self, request):
+		credit_report = CreditReport.objects.filter(user=request.user).order_by('-updated_on').first()
+		
+		if not credit_report:
+			return Response({"error": "CreditReport not found for the user."}, status=status.HTTP_404_NOT_FOUND)
+		
+		# Check if the report is older than 30 days or grade_response is empty/null
+		if now() - credit_report.updated_on > timedelta(days=30) or not credit_report.grade_response:
+			# Call the TU API if the condition is met
+			api_response = services.fetch_credit_risk_score(request.user, credit_report)
 			
-			# Assuming `api_response` is a dictionary that includes a responseCode.
 			if api_response.get("responseCode") == 200:
-				# You can create your CreditReport object here with the serializer.validated_data
-				# Example:
-				# CreditReport.objects.create(**serializer.validated_data)
-				return Response(api_response, status=status.HTTP_200_OK)
+				data = {
+					"user": credit_report.user.pkid,
+					"is_registered": credit_report.is_registered,
+					"credit_score": credit_report.credit_score,
+					"grade_response": credit_report.grade_response,
+					"tlo_response": credit_report.tlo_response,
+					"updated_on": credit_report.updated_on.strftime("%Y-%m-%d %H:%M:%S")
+				}
+				return Response(data, status=status.HTTP_200_OK)
 			else:
 				return Response(api_response, status=status.HTTP_400_BAD_REQUEST)
 		else:
-			# Return serializer errors if validation fails
-			return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-class CheckCreditRiskScoreView(APIView):
-	permission_classes = [IsAuthenticated]
-	
-	def post(self, request, *args, **kwargs):
-		# Convert QueryDict to dictionary
-		data = request.data
+			data = {
+				"user": credit_report.user.pkid,
+				"is_registered": credit_report.is_registered,
+				"credit_score": credit_report.credit_score,
+				"grade_response": credit_report.grade_response,
+				"tlo_response": credit_report.tlo_response,
+				"updated_on": credit_report.updated_on.strftime("%Y-%m-%d %H:%M:%S")
+			}
+			return Response(data, status=status.HTTP_200_OK)
 		
-		# Call your service layer
-		api_response = services.fetch_credit_risk_score(data)
-		
-		CreditReport.objects.update(
-		
-		)
-		
-		return Response(api_response, status=status.HTTP_200_OK if api_response.get("responseCode") == 200 else status.HTTP_400_BAD_REQUEST)
-
-
-class CheckTotalOutstandingLoanView(APIView):
-	permission_classes = [IsAuthenticated]
-	
-	def post(self, request, *args, **kwargs):
-		data = request.data.copy()
-		api_response = services.fetch_total_outstanding_loan(data)
-		
-		CreditReport.objects.update(
-		
-		)
-		
-		return Response(api_response, status=status.HTTP_200_OK if api_response.get("responseCode") == 200 else status.HTTP_400_BAD_REQUEST)
-
-
-class EmailCreditViewReportView(APIView):
-	permission_classes = [IsAuthenticated]
-	
-	def post(self, request, *args, **kwargs):
-		data = request.data.copy()
-		api_response = services.send_email_creditview_report(data)
+	@action(detail=False, methods=['post'])
+	def email_credit_report(self, request):
+		api_response = services.send_email_creditview_report(request.user)
 		
 		return Response(api_response, status=status.HTTP_200_OK if api_response.get("responseCode") == 200 else status.HTTP_400_BAD_REQUEST)

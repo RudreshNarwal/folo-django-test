@@ -1,6 +1,8 @@
 from django.utils.timezone import now, timedelta
 
 from core_apps.payments.models import Subscription
+from core_apps.transunion.models import CreditReport
+from core_apps.transunion.services import register_with_tu
 
 
 def create_subscription(transaction):
@@ -27,3 +29,10 @@ def create_subscription(transaction):
 	)
 	
 	return subscription, True
+
+
+def create_registration_for_tu(user):
+	try:
+		cr = CreditReport.objects.get(user=user)
+	except CreditReport.DoesNotExist:
+		register_with_tu(user)

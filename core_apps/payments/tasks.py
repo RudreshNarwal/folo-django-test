@@ -2,9 +2,10 @@ import base64
 from celery import shared_task
 import requests
 from django.conf import settings
-from .models import Transaction
+from .models import Transaction, User
 from .services.mpesa import get_access_token
-from .services.subscription import create_subscription
+from .services.subscription import create_registration_for_tu, create_subscription
+from ..transunion.services import register_with_tu
 
 
 @shared_task
@@ -46,6 +47,8 @@ def query_payment_status(transaction_id):
 				if str(response_data.get("ResultCode")) == "0":
 					transaction.status = 'Successful'
 					if transaction.plan and transaction.plan.type == 'Subscription':
+						user = User.objects.get(pk=transaction.user_id)
+						create_registration_for_tu(user)
 						create_subscription(transaction)
 				else:
 					transaction.status = 'Failed'

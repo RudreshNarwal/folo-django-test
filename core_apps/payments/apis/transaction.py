@@ -9,8 +9,9 @@ from django.http import JsonResponse
 from core_apps.payments.models import Transaction
 from ..serializers.transaction import TransactionSerializer, TransactionCreateSerializer
 from core_apps.payments.services.mpesa import get_access_token, make_stk_push_request
-from core_apps.payments.services.subscription import create_subscription
+from core_apps.payments.services.subscription import create_registration_for_tu, create_subscription
 from core_apps.payments.tasks import query_payment_status
+from ...transunion.services import register_with_tu
 
 
 class TransactionDetailView(APIView):
@@ -107,6 +108,7 @@ class MpesaCallbackAPIView(APIView):
                             
                     # New: Check if the plan is a subscription and create a subscription
                     if transaction.plan and transaction.plan.type == 'Subscription':
+                        create_registration_for_tu(request.user)
                         create_subscription(transaction)
     
                 # Save the whole response for record-keeping regardless of success or failure

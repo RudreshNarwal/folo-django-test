@@ -140,7 +140,6 @@ USE_TZ = True
 
 SITE_ID = 1  # default site for the project is 1
 
-ADMIN_URL = "supersecret/"
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.1/howto/static-files/
@@ -239,7 +238,9 @@ ADMINS = [("Rudresh Narwal", "rudresh@ubuntuonline.co.ke")]
 # TODO add domain names of the production server
 CSRF_TRUSTED_ORIGINS = ["https://folo.money"]
 SECRET_KEY = env("DJANGO_SECRET_KEY")
-ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["folo.money"])
+ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["folo.money"]) + ["localhost", "0.0.0.0", "127.0.0.1"]
+CORS_ALLOW_ALL_ORIGINS = True # set false for prod TODO
+CORS_ALLOW_CREDENTIALS = True # set false for prod TODO
 ADMIN_URL = env("DJANGO_ADMIN_URL")
 DATABASES = {"default": env.db("DATABASE_URL")}
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

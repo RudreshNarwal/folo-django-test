@@ -12,8 +12,10 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 
+from generics.utils.deactivate_expired_subscriptions import deactivate_expired_subscriptions
 from .models import CreditReport
 from . import services
+from ..payments.models import Subscription
 
 
 class CreditReportViewSet(viewsets.ModelViewSet):
@@ -34,10 +36,17 @@ class CreditReportViewSet(viewsets.ModelViewSet):
 	
 	@action(detail=False, methods=['get'])
 	def check_credit_risk(self, request):
+		# Checking whether the user is registered or not
 		credit_report = CreditReport.objects.filter(user=request.user).order_by('-updated_on').first()
 		
 		if not credit_report:
-			return Response({"error": "CreditReport not found for the user."}, status=status.HTTP_404_NOT_FOUND)
+			# for the case where user registration is pending
+			return Response({"message": "CreditReport not found for the user."}, status=status.HTTP_404_NOT_FOUND)
+			
+		# First, deactivate expired subscriptions
+		deactivate_expired_subscriptions(request.user)
+		# Check for active subscription
+		has_active_subscription = Subscription.objects.filter(user=request.user, end_date__gte=now(), is_active=True).exists()
 		
 		# Check if the report is older than 30 days or grade_response is empty/null
 		if now() - credit_report.updated_on > timedelta(days=30) or not credit_report.grade_response:
@@ -51,7 +60,8 @@ class CreditReportViewSet(viewsets.ModelViewSet):
 					"credit_score": credit_report.credit_score,
 					"grade_response": credit_report.grade_response,
 					"tlo_response": credit_report.tlo_response,
-					"updated_on": credit_report.updated_on.strftime("%Y-%m-%d %H:%M:%S")
+					"updated_on": credit_report.updated_on.strftime("%Y-%m-%d %H:%M:%S"),
+					"has_active_subscription": has_active_subscription
 				}
 				return Response(data, status=status.HTTP_200_OK)
 			else:
@@ -63,7 +73,8 @@ class CreditReportViewSet(viewsets.ModelViewSet):
 				"credit_score": credit_report.credit_score,
 				"grade_response": credit_report.grade_response,
 				"tlo_response": credit_report.tlo_response,
-				"updated_on": credit_report.updated_on.strftime("%Y-%m-%d %H:%M:%S")
+				"updated_on": credit_report.updated_on.strftime("%Y-%m-%d %H:%M:%S"),
+				"has_active_subscription": has_active_subscription
 			}
 			return Response(data, status=status.HTTP_200_OK)
 		

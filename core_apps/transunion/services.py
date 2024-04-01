@@ -57,6 +57,7 @@ def fetch_credit_risk_score(user, credit_report):
 		grade_response = response.json()
 		
 		tlo_response = fetch_total_outstanding_loan(user)
+		send_email_creditview_report(user)
 		
 		if grade_response.get("responseCode") == 200:
 			credit_report.grade_response = grade_response.get("data")
@@ -119,7 +120,8 @@ def send_email_creditview_report(user):
 		"name1": user.first_name,
 		"name2": user.last_name,
 		"nationalId": user.nation_id,
-		"telephoneMobile": user.get_mobile_without_plus
+		"telephoneMobile": user.get_mobile_without_plus,
+		"emailAddress": user.email
 	})
 	
 	response = requests.post(url, json=data, headers=headers)

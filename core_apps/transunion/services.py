@@ -12,10 +12,10 @@ def register_with_tu(user):
 	headers = {"Content-Type": "application/json", 'Authorization': 'Basic S0VGcTdORTN2ejpQbk5lR1VjQmR4MEVNSg=='}
 	data = {}
 	data.update({
-		"username": settings.TRANSUNION_UAT_USERNAME,
-		"password": settings.TRANSUNION_UAT_PASSWORD,
-		"code": settings.TRANSUNION_UAT_CODE,
-		"infinityCode": settings.TRANSUNION_UAT_INFINITY_CODE,
+		"username": settings.TRANSUNION_USERNAME,
+		"password": settings.TRANSUNION_PASSWORD,
+		"code": settings.TRANSUNION_CODE,
+		"infinityCode": settings.TRANSUNION_INFINITY_CODE,
 		"reportReason": 1,
 		"reportSector": 1,
 		"names": f"{user.last_name} {user.first_name}",
@@ -39,10 +39,10 @@ def fetch_credit_risk_score(user, credit_report):
 		'Authorization': 'Basic S0VGcTdORTN2ejpQbk5lR1VjQmR4MEVNSg=='
 	}
 	data = {
-		"username": settings.TRANSUNION_UAT_USERNAME,
-		"password": settings.TRANSUNION_UAT_PASSWORD,
-		"code": settings.TRANSUNION_UAT_CODE,
-		"infinityCode": settings.TRANSUNION_UAT_INFINITY_CODE,
+		"username": settings.TRANSUNION_USERNAME,
+		"password": settings.TRANSUNION_PASSWORD,
+		"code": settings.TRANSUNION_CODE,
+		"infinityCode": settings.TRANSUNION_INFINITY_CODE,
 		"reportReason": 2,
 		"reportSector": 1,
 		"name1": user.first_name,
@@ -78,10 +78,10 @@ def fetch_total_outstanding_loan(user):
 	}
 	data = {}
 	data.update({
-		"username": settings.TRANSUNION_UAT_USERNAME,
-		"password": settings.TRANSUNION_UAT_PASSWORD,
-		"code": settings.TRANSUNION_UAT_CODE,
-		"infinityCode": settings.TRANSUNION_UAT_INFINITY_CODE,
+		"username": settings.TRANSUNION_USERNAME,
+		"password": settings.TRANSUNION_PASSWORD,
+		"code": settings.TRANSUNION_CODE,
+		"infinityCode": settings.TRANSUNION_INFINITY_CODE,
 		"reportReason": 2,
 		"reportSector": 1,
 		"name1": user.first_name,
@@ -111,10 +111,10 @@ def send_email_creditview_report(user):
 	}
 	data = {}
 	data.update({
-		"username": settings.TRANSUNION_UAT_USERNAME,
-		"password": settings.TRANSUNION_UAT_PASSWORD,
-		"code": settings.TRANSUNION_UAT_CODE,
-		"infinityCode": settings.TRANSUNION_UAT_INFINITY_CODE,
+		"username": settings.TRANSUNION_USERNAME,
+		"password": settings.TRANSUNION_PASSWORD,
+		"code": settings.TRANSUNION_CODE,
+		"infinityCode": settings.TRANSUNION_INFINITY_CODE,
 		"reportReason": 2,
 		"reportSector": 1,
 		"name1": user.first_name,

@@ -18,9 +18,6 @@ if env_file.is_file():
 
 DEBUG = env.bool('DJANGO_DEBUG', False)
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/4.1/howto/deployment/checklist/
-
 ROOT_URLCONF = "foloDjango.urls"
 
 DJANGO_APPS = [

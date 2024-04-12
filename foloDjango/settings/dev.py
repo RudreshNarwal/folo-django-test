@@ -15,6 +15,7 @@ env_file = ROOT_DIR / '.envs/.production/.django'
 # Check if the .env file exists and then read it
 if env_file.is_file():
     environ.Env.read_env(str(env_file))
+    
 
 DEBUG = env.bool('DJANGO_DEBUG', False)
 

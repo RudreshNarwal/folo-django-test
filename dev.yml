@@ -4,7 +4,7 @@ services:
     api: &api
         build:
             context: .
-            dockerfile: ./docker/production/django/Dockerfile
+            dockerfile: ./docker/dev/django/Dockerfile
         command: /start
         image: folo_money
         expose: #expose: Documents the ports that the container uses, making them accessible to other containers within the same Docker network.
@@ -13,7 +13,7 @@ services:
             - static_volume:/app/staticfiles
             - media_volume:/app/mediafiles
         env_file:
-            - ./.envs/.production/.django
+            - ./.envs/.dev/.django
         depends_on:
 #            - postgres
             - redis
@@ -51,6 +51,6 @@ networks:
 volumes:
     static_volume: {}
     media_volume: {}
-    production_postgres_data: {}
-    production_postgres_data_backups: {}
+    dev_postgres_data: {}
+    dev_postgres_data_backups: {}
     flower_data: {}

@@ -26,7 +26,6 @@ class CustomUserManager(BaseUserManager):
 			raise ValueError(_("Users must have a mobile."))
 		if email:
 			email = self.normalize_email(email)
-			print(email)
 			self.email_validator(email)
 		else:
 			raise ValueError(_("Users must have an email address."))

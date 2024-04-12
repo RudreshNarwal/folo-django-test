@@ -1,0 +1,63 @@
+#Makefile is a special format file that is used by the make utility to determine how to build programs
+#or manage tasks. It automates the compilation process, reducing the complexity and effort required to
+#compile large programs with multiple components. Makefiles are particularly useful in software development
+#for managing and automating the build process, but they can also be used for automating any sequence of tasks.
+
+build:
+	docker compose -f dev.yml up --build -d --remove-orphans
+# -f flag is to specify alternate compose file
+up:
+	docker compose -f dev.yml up -d
+
+down:
+	docker compose -f dev.yml down
+
+show-logs:
+	docker compose -f dev.yml logs
+
+show-logs-api:
+	docker compose -f dev.yml logs api
+
+makemigrations:
+	docker compose -f dev.yml run --rm api python manage.py makemigrations
+#run --rm: This tells Docker Compose to run a one-off command in a service. The --rm flag means Docker will
+#automatically remove the container when the command completes. This is useful for avoiding clutter from temporary containers.
+migrate:
+	docker compose -f dev.yml run --rm api python manage.py migrate
+
+collectstatic:
+	docker compose -f dev.yml run --rm api python manage.py collectstatic --no-input --clear
+
+superuser:
+	docker compose -f dev.yml run --rm api python manage.py createsuperuser
+
+down-v:
+	docker compose -f dev.yml down -v
+# Bring down the container and remove volumes
+volume:
+	docker volume inspect src_local_postgres_data
+
+folo-db:
+	docker compose -f dev.yml exec postgres psql --username=rudresh --dbname=folomoney
+
+flake8:
+	docker compose -f dev.yml exec api flake8 .
+
+black-check:
+	docker compose -f dev.yml exec api black --check --exclude=migrations .
+
+black-diff:
+	docker compose -f dev.yml exec api black --diff --exclude=migrations .
+
+black:
+	docker compose -f dev.yml exec api black --exclude=migrations .
+
+isort-check:
+	docker compose -f dev.yml exec api isort . --check-only --skip venv --skip migrations
+
+isort-diff:
+	docker compose -f dev.yml exec api isort . --diff --skip venv --skip migrations
+
+isort:
+	docker compose -f dev.yml exec api isort . --skip venv --skip migrations
+

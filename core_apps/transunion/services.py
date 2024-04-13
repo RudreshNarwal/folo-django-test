@@ -8,8 +8,11 @@ from core_apps.transunion.models import CreditReport
 
 
 def register_with_tu(user):
-	url = "https://secure3.crbafrica.com/crbws/rest/nipashe_indirect/ke/register"
-	headers = {"Content-Type": "application/json", 'Authorization': 'Basic S0VGcTdORTN2ejpQbk5lR1VjQmR4MEVNSg=='}
+	url = f"{settings.TRANSUNION_ENDPOINT}/register"
+	headers = {
+		"Content-Type": "application/json",
+		# 'Authorization': 'Basic S0VGcTdORTN2ejpQbk5lR1VjQmR4MEVNSg=='
+	}
 	data = {}
 	data.update({
 		"username": settings.TRANSUNION_USERNAME,
@@ -33,10 +36,10 @@ def register_with_tu(user):
 
 
 def fetch_credit_risk_score(user, credit_report):
-	url = "https://secure3.crbafrica.com/crbws/rest/nipashe_indirect/ke/credit_risk_score"
+	url = f"{settings.TRANSUNION_ENDPOINT}/credit_risk_score"
 	headers = {
 		"Content-Type": "application/json",
-		'Authorization': 'Basic S0VGcTdORTN2ejpQbk5lR1VjQmR4MEVNSg=='
+		# 'Authorization': 'Basic S0VGcTdORTN2ejpQbk5lR1VjQmR4MEVNSg=='
 	}
 	data = {
 		"username": settings.TRANSUNION_USERNAME,
@@ -71,10 +74,10 @@ def fetch_credit_risk_score(user, credit_report):
 
 
 def fetch_total_outstanding_loan(user):
-	url = "https://secure3.crbafrica.com/crbws/rest/nipashe_indirect/ke/total_outstanding_loan"
+	url = f"{settings.TRANSUNION_ENDPOINT}/total_outstanding_loan"
 	headers = {
 		"Content-Type": "application/json",
-		'Authorization': 'Basic S0VGcTdORTN2ejpQbk5lR1VjQmR4MEVNSg=='
+		# 'Authorization': 'Basic S0VGcTdORTN2ejpQbk5lR1VjQmR4MEVNSg=='
 	}
 	data = {}
 	data.update({
@@ -104,10 +107,10 @@ def fetch_total_outstanding_loan(user):
 
 
 def send_email_creditview_report(user):
-	url = "https://secure3.crbafrica.com/crbws/rest/nipashe_indirect/ke/email_creditview_report"
+	url = f"{settings.TRANSUNION_ENDPOINT}/email_creditview_report"
 	headers = {
 		"Content-Type": "application/json",
-		"Authorization": 'Basic S0VGcTdORTN2ejpQbk5lR1VjQmR4MEVNSg=='
+		# "Authorization": 'Basic S0VGcTdORTN2ejpQbk5lR1VjQmR4MEVNSg=='
 	}
 	data = {}
 	data.update({

@@ -40,7 +40,7 @@ def query_payment_status(transaction_id):
 				"CheckoutRequestID": checkout_request_id
 			}
 			
-			response = requests.post('https://sandbox.safaricom.co.ke/mpesa/stkpushquery/v1/query', json=data, headers=headers)
+			response = requests.post(f"{settings.MPESA_ENDPOINT}/mpesa/stkpushquery/v1/query", json=data, headers=headers)
 			if response.status_code == 200:
 				response_data = response.json()
 				transaction.response = {"from": "Status Api", **response_data}

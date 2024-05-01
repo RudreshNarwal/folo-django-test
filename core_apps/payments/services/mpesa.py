@@ -9,7 +9,7 @@ def get_access_token():
 	"""Function to call the external service and get an access token."""
 	try:
 		response = requests.get(
-			'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials',
+			f"{settings.MPESA_ENDPOINT}/oauth/v1/generate?grant_type=client_credentials",
 			headers={
 				'Authorization': f'Basic {settings.MPESA_CLIENT_TOKEN}',
 			}
@@ -48,7 +48,7 @@ def make_stk_push_request(access_token, transaction):
 		"TransactionDesc": "Credit Report Subscription"
 	}
 	
-	response = requests.post('https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest', json=data, headers=headers)
+	response = requests.post(f"{settings.MPESA_ENDPOINT}/mpesa/stkpush/v1/processrequest", json=data, headers=headers)
 	
 	if response.status_code == 200:
 		response_body = response.json()

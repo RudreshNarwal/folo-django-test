@@ -4,6 +4,7 @@ import logging
 import requests
 from django.contrib.auth import get_user_model
 from django.conf import settings
+from django.core.mail import mail_admins
 
 from core_apps.transunion.models import CreditReport
 
@@ -12,10 +13,8 @@ def register_with_tu(user):
 	url = f"{settings.TRANSUNION_ENDPOINT}/register"
 	headers = {
 		"Content-Type": "application/json",
-		# 'Authorization': 'Basic S0VGcTdORTN2ejpQbk5lR1VjQmR4MEVNSg=='
 	}
-	data = {}
-	data.update({
+	data = {
 		"username": settings.TRANSUNION_USERNAME,
 		"password": settings.TRANSUNION_PASSWORD,
 		"code": settings.TRANSUNION_CODE,
@@ -24,16 +23,23 @@ def register_with_tu(user):
 		"reportSector": 1,
 		"names": f"{user.last_name} {user.first_name}",
 		"documentNumber": user.nation_id,
-		"telephoneMobile": user.get_mobile_without_plus
-	})
+		"telephoneMobile": user.get_mobile_without_plus,
+	}
+	
 	response = requests.post(url, json=data, headers=headers)
 	api_response = response.json()
 	response_code = api_response.get("responseCode")
 	
-	logging.info(f"Registration successful:: Response Code -> {response_code}")
-	
 	if 200 <= response_code < 300:
 		CreditReport.objects.create(user=user, is_registered=True)
+	else:
+		error_message = f"Failed to register with TU. Response Code: {response_code}, User: {user.get_mobile_without_plus}"
+		logging.error(error_message)
+		# Send email to admins
+		mail_admins(
+			subject="TransUnion Registration Failed",
+			message=error_message
+		)
 	
 	return api_response
 
@@ -42,7 +48,6 @@ def fetch_credit_risk_score(user, credit_report):
 	url = f"{settings.TRANSUNION_ENDPOINT}/credit_risk_score"
 	headers = {
 		"Content-Type": "application/json",
-		# 'Authorization': 'Basic S0VGcTdORTN2ejpQbk5lR1VjQmR4MEVNSg=='
 	}
 	data = {
 		"username": settings.TRANSUNION_USERNAME,
@@ -113,7 +118,6 @@ def send_email_creditview_report(user):
 	url = f"{settings.TRANSUNION_ENDPOINT}/email_creditview_report"
 	headers = {
 		"Content-Type": "application/json",
-		# "Authorization": 'Basic S0VGcTdORTN2ejpQbk5lR1VjQmR4MEVNSg=='
 	}
 	data = {}
 	data.update({

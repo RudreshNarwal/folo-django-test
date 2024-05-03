@@ -50,8 +50,8 @@ class InitiateTransactionAPIView(APIView):
 			
 			# Celery task
 			transaction_id = transaction.pkid
-			# Schedule the task to run after 180 seconds
-			query_payment_status.apply_async((transaction_id,), countdown=91)
+			# Schedule the task to run after 90 seconds
+			query_payment_status.apply_async((transaction_id,), countdown=90)
 			
 			# Use the utility function to get the access token
 			access_token, error = get_access_token()

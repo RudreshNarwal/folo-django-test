@@ -1,3 +1,4 @@
+import logging
 from django.utils.timezone import now, timedelta
 
 from core_apps.payments.models import Subscription
@@ -32,7 +33,9 @@ def create_subscription(transaction):
 
 
 def create_registration_for_tu(user):
+	logging.info(f"Checking registration for TU")
 	try:
 		cr = CreditReport.objects.get(user=user)
 	except CreditReport.DoesNotExist:
+		logging.info(f"Credit for doesn't exist for TU")
 		register_with_tu(user)

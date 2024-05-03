@@ -1,4 +1,5 @@
 # transunion/services/api_service.py
+import logging
 
 import requests
 from django.contrib.auth import get_user_model
@@ -28,6 +29,8 @@ def register_with_tu(user):
 	response = requests.post(url, json=data, headers=headers)
 	api_response = response.json()
 	response_code = api_response.get("responseCode")
+	
+	logging.info(f"Registration successful:: Response Code -> {response_code}")
 	
 	if 200 <= response_code < 300:
 		CreditReport.objects.create(user=user, is_registered=True)

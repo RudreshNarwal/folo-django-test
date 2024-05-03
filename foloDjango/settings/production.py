@@ -193,12 +193,19 @@ SIMPLE_JWT = {
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
-    "filters": {"require_debug_false": {"()": "django.utils.log.RequireDebugFalse"}},
+    "filters": {
+        "require_debug_false": {
+            "()": "django.utils.log.RequireDebugFalse"
+        }
+    },
     "formatters": {
         "verbose": {
             "format": "%(levelname)s %(asctime)s %(module)s "
-            "%(process)d %(thread)d %(message)s"
-        }
+                      "%(process)d %(thread)d %(message)s"
+        },
+        "simple": {
+            "format": "%(levelname)s %(message)s"
+        },
     },
     "handlers": {
         "mail_admins": {
@@ -211,9 +218,23 @@ LOGGING = {
             "class": "logging.StreamHandler",
             "formatter": "verbose",
         },
+        "celery": {
+            "level": "INFO",
+            "class": "logging.StreamHandler",
+            "formatter": "simple",
+            "stream": "ext://sys.stdout",  # Ensures log output goes to standard output
+        }
     },
-    "root": {"level": "INFO", "handlers": ["console"]},
+    "root": {
+        "level": "INFO",
+        "handlers": ["console"]
+    },
     "loggers": {
+        "django": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": True,
+        },
         "django.request": {
             "handlers": ["mail_admins"],
             "level": "ERROR",
@@ -224,8 +245,14 @@ LOGGING = {
             "level": "ERROR",
             "propagate": True,
         },
+        "celery": {
+            "handlers": ["celery"],
+            "level": "INFO",
+            "propagate": False
+        }
     },
 }
+
 
 
 ADMINS = [("Rudresh Narwal", "rudresh@ubuntuonline.co.ke")]

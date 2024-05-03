@@ -6,6 +6,7 @@ from .models import Transaction, User
 from .services.mpesa import get_access_token
 from .services.subscription import create_registration_for_tu, create_subscription
 from ..transunion.services import register_with_tu
+import logging
 
 
 @shared_task
@@ -18,8 +19,7 @@ def query_payment_status(transaction_id):
 			access_token, error = get_access_token()
 			
 			if error:
-				# Implement error handling or logging here
-				# Example: logging.error(f"Error getting access token: {error}")
+				logging.error(f"Error getting access token: {error}")
 				return
 			
 			headers = {
@@ -54,5 +54,5 @@ def query_payment_status(transaction_id):
 					transaction.status = 'Failed'
 				transaction.save()
 	except Transaction.DoesNotExist:
-		# Implement logging or error handling for transaction not found
+		logging.info(f"Transaction doesn't exist {transaction.id}")
 		pass

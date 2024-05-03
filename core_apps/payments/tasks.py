@@ -54,5 +54,5 @@ def query_payment_status(transaction_id):
 					transaction.status = 'Failed'
 				transaction.save()
 	except Transaction.DoesNotExist:
-		logging.info(f"Transaction doesn't exist {transaction.id}")
+		logging.info(f"Transaction doesn't exist")
 		pass

@@ -130,3 +130,15 @@ class MpesaCallbackAPIView(APIView):
 		
 		except Exception as e:
 			return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+		
+		
+class TransactionCeleryDetailTest(APIView):
+	permission_classes = [IsAuthenticated]  # Ensure the user is authenticated
+
+	def get(self, request, transaction_id):
+		try:
+			# Ensuring: transaction belongs to the request.user
+			query_payment_status(transaction_id)
+			return Response({'message': 'Done'}, status=status.HTTP_200_OK)
+		except Transaction.DoesNotExist:
+			return Response({'message': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)

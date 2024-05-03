@@ -1,10 +1,11 @@
-import logging
 from django.utils.timezone import now, timedelta
 
 from core_apps.payments.models import Subscription
 from core_apps.transunion.models import CreditReport
 from core_apps.transunion.services import register_with_tu
+from celery.utils.log import get_task_logger
 
+logger = get_task_logger(__name__)
 
 def create_subscription(transaction):
 	# Check if a subscription already exists for this transaction
@@ -33,9 +34,9 @@ def create_subscription(transaction):
 
 
 def create_registration_for_tu(user):
-	logging.info(f"Checking registration for TU")
+	logger.info(f"Checking registration for TU")
 	try:
 		cr = CreditReport.objects.get(user=user)
 	except CreditReport.DoesNotExist:
-		logging.info(f"Credit for doesn't exist for TU")
+		logger.info(f"Credit for doesn't exist for TU")
 		register_with_tu(user)

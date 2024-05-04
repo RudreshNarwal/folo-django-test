@@ -33,7 +33,7 @@ def register_with_tu(user):
 	if 200 <= response_code < 300:
 		CreditReport.objects.create(user=user, is_registered=True)
 	else:
-		error_message = f"Failed to register with TU. Response Code: {response_code}, User: {user.get_mobile_without_plus}"
+		error_message = f"Failed to register with TU. Response Code: {response_code}, User: {user.get_mobile_without_plus}. Also, update user subscription as playment was successful"
 		logging.error(error_message)
 		# Send email to admins
 		mail_admins(

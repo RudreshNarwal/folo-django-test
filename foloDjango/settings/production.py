@@ -43,6 +43,7 @@ THIRD_PARTY_APPS = [
 	"djcelery_email",
 	'rest_framework_simplejwt',
 	"rest_framework.authtoken",
+	"django_ses"
 ]
 
 LOCAL_APPS = [
@@ -297,7 +298,7 @@ ADMINS = [("Kevin", "kevin@ubuntuonline.co.ke"), ("Rudresh", "rudresh@ubuntuonli
 AWS_ACCESS_KEY_ID = env("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = env("AWS_SECRET_ACCESS_KEY")
 AWS_SES_REGION_NAME = 'af-south-1'
-AWS_SES_REGION_ENDPOINT = 'rudresh@ubuntuonline.co.ke.af-south-1.amazonaws.com'
+AWS_SES_REGION_ENDPOINT = 'email.af-south-1.amazonaws.com'
 EMAIL_USE_TLS = True
 DOMAIN = env("DOMAIN")
 

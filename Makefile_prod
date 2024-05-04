@@ -25,6 +25,9 @@ makemigrations:
 migrate:
 	docker compose -f production.yml run --rm api python manage.py migrate
 
+run-shell:
+	docker compose -f production.yml run --rm api python manage.py shell
+
 collectstatic:
 	docker compose -f production.yml run --rm api python manage.py collectstatic --no-input --clear
 

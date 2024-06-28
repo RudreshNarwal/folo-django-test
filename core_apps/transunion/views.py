@@ -42,7 +42,6 @@ class CreditReportViewSet(viewsets.ModelViewSet):
 		if not credit_report:
 			# for the case where user registration is pending
 			return Response({"message": "CreditReport not found for the user."}, status=status.HTTP_404_NOT_FOUND)
-			
 		# First, deactivate expired subscriptions
 		deactivate_expired_subscriptions(request.user)
 		# Check for active subscription

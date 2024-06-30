@@ -26,7 +26,7 @@ class CreditReportViewSet(viewsets.ModelViewSet):
 		# Check if the user is already registered
 		if CreditReport.objects.filter(user=request.user, is_registered=True).exists():
 			return Response({"message": "User is already registered."}, status=status.HTTP_400_BAD_REQUEST)
-		
+	
 		api_response = services.register_with_tu(request.user)
 		response_code = api_response.get("responseCode")
 		if 200 <= response_code < 300:

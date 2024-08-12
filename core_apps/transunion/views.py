@@ -47,8 +47,8 @@ class CreditReportViewSet(viewsets.ModelViewSet):
 		# Check for active subscription
 		has_active_subscription = Subscription.objects.filter(user=request.user, end_date__gte=now(), is_active=True).exists()
 		
-		# Check if the report is older than 30 days or grade_response is empty/null
-		if now() - credit_report.updated_on > timedelta(days=30) or not credit_report.grade_response:
+		# Check if the report is older than 30 days, grade_response is empty/null, and user has an active subscription
+		if has_active_subscription and (now() - credit_report.updated_on > timedelta(days=30) or not credit_report.grade_response):
 			# Call the TU API if the condition is met
 			api_response = services.fetch_credit_risk_score(request.user, credit_report)
 			

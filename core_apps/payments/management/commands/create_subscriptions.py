@@ -6,6 +6,7 @@ from core_apps.users.models import User
 
 #### Script to run this command #####
 #python manage.py create_subscriptions <mobile_number>
+# docker compose -f production.yml run --rm api python manage.py create_subscriptions <mobile_number>
 #python manage.py create_subscriptions 725763465
 
 class Command(BaseCommand):
@@ -27,7 +28,7 @@ class Command(BaseCommand):
         # Check if the user has a successful transaction without a subscription
         successful_transactions = Transaction.objects.filter(
             user=user,
-            status='successful',
+            status='Successful',
             subscription__isnull=True  # Ensure there's no existing subscription for this transaction
         )
 

@@ -37,6 +37,15 @@ class Command(BaseCommand):
             return
 
         for transaction in successful_transactions:
+            # Check if there's already a subscription created for this transaction
+            existing_subscription = Subscription.objects.filter(
+                transaction=transaction
+            ).exists()
+            
+            if existing_subscription:
+                self.stdout.write(self.style.WARNING(f"Subscription already exists for transaction {transaction.id}. Skipping creation."))
+                continue
+            
             # Check if the user already has an active subscription for this plan
             if not Subscription.objects.filter(user=user, plan=transaction.plan, is_active=True).exists():
                 # Create the subscription

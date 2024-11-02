@@ -26,7 +26,7 @@ class CreditReportViewSet(viewsets.ModelViewSet):
 		# Check if the user is already registered
 		if CreditReport.objects.filter(user=request.user, is_registered=True).exists():
 			return Response({"message": "User is already registered."}, status=status.HTTP_400_BAD_REQUEST)
-		
+	
 		api_response = services.register_with_tu(request.user)
 		response_code = api_response.get("responseCode")
 		if 200 <= response_code < 300:
@@ -42,14 +42,13 @@ class CreditReportViewSet(viewsets.ModelViewSet):
 		if not credit_report:
 			# for the case where user registration is pending
 			return Response({"message": "CreditReport not found for the user."}, status=status.HTTP_404_NOT_FOUND)
-			
 		# First, deactivate expired subscriptions
 		deactivate_expired_subscriptions(request.user)
 		# Check for active subscription
 		has_active_subscription = Subscription.objects.filter(user=request.user, end_date__gte=now(), is_active=True).exists()
 		
-		# Check if the report is older than 30 days or grade_response is empty/null
-		if now() - credit_report.updated_on > timedelta(days=30) or not credit_report.grade_response:
+		# Check if the report is older than 30 days, grade_response is empty/null, and user has an active subscription
+		if has_active_subscription and (now() - credit_report.updated_on > timedelta(days=30) or not credit_report.grade_response):
 			# Call the TU API if the condition is met
 			api_response = services.fetch_credit_risk_score(request.user, credit_report)
 			

@@ -6,10 +6,13 @@ from .models import Transaction, User
 from .services.mpesa import get_access_token
 from .services.subscription import create_registration_for_tu, create_subscription
 from ..transunion.services import register_with_tu
+from celery.utils.log import get_task_logger
+
+logger = get_task_logger(__name__)
 
 
-@shared_task
-def query_payment_status(transaction_id):
+@shared_task(bind=True, max_retries=3, default_retry_delay=20)
+def query_payment_status(self, transaction_id):
 	try:
 		transaction = Transaction.objects.get(pk=transaction_id)
 		
@@ -18,9 +21,8 @@ def query_payment_status(transaction_id):
 			access_token, error = get_access_token()
 			
 			if error:
-				# Implement error handling or logging here
-				# Example: logging.error(f"Error getting access token: {error}")
-				return
+				logger.error(f"Error getting access token: {error}")
+				raise self.retry(exc=Exception(error))
 			
 			headers = {
 				'Authorization': f'Bearer {access_token}',
@@ -46,13 +48,26 @@ def query_payment_status(transaction_id):
 				transaction.response = {"from": "Status Api", **response_data}
 				if str(response_data.get("ResultCode")) == "0":
 					transaction.status = 'Successful'
+					transaction.save()
 					if transaction.plan and transaction.plan.type == 'Subscription':
 						user = User.objects.get(pk=transaction.user_id)
 						create_registration_for_tu(user)
 						create_subscription(transaction)
 				else:
 					transaction.status = 'Failed'
-				transaction.save()
+					transaction.save()
+					# Retry task if status is still Pending after an API call
+					if response_data.get("ResultCode") == "1":  # Assuming '1' means Pending
+						raise self.retry()
+				return "Transaction updated successfully"
+			else:
+				logger.error(f"Error querying payment status: HTTP {response.status_code}")
+				raise self.retry(exc=response.status_code)
+		else:
+			return "No action needed, transaction already completed."
+	
 	except Transaction.DoesNotExist:
-		# Implement logging or error handling for transaction not found
-		pass
+		logger.info(f"Transaction with ID {transaction_id} doesn't exist")
+	except Exception as e:
+		logger.error(f"Unexpected error occurred: {str(e)}")
+		raise self.retry(exc=e)

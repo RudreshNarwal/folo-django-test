@@ -50,8 +50,8 @@ class InitiateTransactionAPIView(APIView):
 			
 			# Celery task
 			transaction_id = transaction.pkid
-			# Schedule the task to run after 180 seconds
-			query_payment_status.apply_async((transaction_id,), countdown=130)
+			# Schedule the task to run after 90 seconds
+			query_payment_status.apply_async((transaction_id,), countdown=90)
 			
 			# Use the utility function to get the access token
 			access_token, error = get_access_token()
@@ -130,3 +130,15 @@ class MpesaCallbackAPIView(APIView):
 		
 		except Exception as e:
 			return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+		
+		
+class TransactionCeleryDetailTest(APIView):
+	permission_classes = [IsAuthenticated]  # Ensure the user is authenticated
+
+	def get(self, request, transaction_id):
+		try:
+			# Ensuring: transaction belongs to the request.user
+			query_payment_status(transaction_id)
+			return Response({'message': 'Done'}, status=status.HTTP_200_OK)
+		except Transaction.DoesNotExist:
+			return Response({'message': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)

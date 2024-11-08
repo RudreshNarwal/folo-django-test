@@ -10,7 +10,7 @@ ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 APP_DIR = ROOT_DIR / 'core_apps'
 
 # Define the path to the .env file
-env_file = ROOT_DIR / '.envs/.production/.django'
+env_file = ROOT_DIR / '.envs/.dev/.django'
 
 # Check if the .env file exists and then read it
 if env_file.is_file():

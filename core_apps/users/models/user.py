@@ -205,6 +205,9 @@ class Document(GenericModel):
 	
 	def __str__(self):
 		return f"Document {self.document_type} for {self.user.mobile}"
+	
+	class Meta:
+		unique_together = ('user', 'document_type')
 
 
 class Address(GenericModel):

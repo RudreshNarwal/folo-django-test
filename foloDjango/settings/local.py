@@ -52,6 +52,7 @@ LOCAL_APPS = [
 	"core_apps.users",
 	"core_apps.transunion",
 	"core_apps.payments",
+	"core_apps.wallet",
 	# "core_apps.articles",
 	# "core_apps.ratings",
 	# "core_apps.bookmarks",
@@ -232,7 +233,8 @@ CORS_ALLOW_CREDENTIALS = True
 # CORS_ALLOWED_ORIGINS = ['http://localhost:8080', "https://dev-api.folo.money"]
 # CSRF_TRUSTED_ORIGINS = ['http://localhost:8080', "https://dev-api.folo.money"]
 
-
+AWS_ACCESS_KEY_ID = env("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = env("AWS_SECRET_ACCESS_KEY")
 EMAIL_BACKEND = "djcelery_email.backends.CeleryEmailBackend"
 EMAIL_HOST = env("EMAIL_HOST", default="mailhog")
 EMAIL_PORT = env("EMAIL_PORT")
@@ -252,3 +254,6 @@ MPESA_ENDPOINT=env("MPESA_ENDPOINT")
 MPESA_PASSKEY=env("MPESA_PASSKEY")
 MPESA_CLIENT_TOKEN=env("MPESA_CLIENT_TOKEN")
 MPESA_BUSINESS_CODE=env("MPESA_BUSINESS_CODE")
+
+AWS_STORAGE_BUCKET_NAME=env("AWS_STORAGE_BUCKET_NAME")
+AWS_S3_REGION_NAME=env("AWS_S3_REGION_NAME")

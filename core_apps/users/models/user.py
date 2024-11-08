@@ -28,19 +28,22 @@ from services.send_sms import send_verification_code
 
 class User(AbstractBaseUser, GenericModel, PermissionsMixin):
 	class Gender(models.TextChoices):
-		MALE = (
-			"M",
-			_("Male"),
-		)
-		
-		FEMALE = (
-			"F",
-			_("Female"),
-		)
-		OTHER = (
-			"O",
-			_("Other"),
-		)
+		MALE = ("Male", _("Male"))
+		FEMALE = ("Female", _("Female"))
+		OTHER = ("Other", _("Other"))
+	
+	class MaritalStatus(models.TextChoices):
+		SINGLE = ("Single", _("Single"))
+		MARRIED = ("Married", _("Married"))
+		DIVORCED = ("Divorced", _("Divorced"))
+		WIDOWED = ("Widowed", _("Widowed"))
+	
+	class Title(models.TextChoices):
+		MR = ("Mr.", _("Mr."))
+		MRS = ("Mrs.", _("Mrs."))
+		MS = ("Ms.", _("Ms."))
+		DR = ("Dr.", _("Dr."))
+		PROF = ("Prof.", _("Prof."))
 	
 	"""
 	User Model:
@@ -68,7 +71,6 @@ class User(AbstractBaseUser, GenericModel, PermissionsMixin):
 	is_admin = models.BooleanField(default=False)
 	is_email_verified = models.BooleanField(default=False)
 	is_mobile_verified = models.BooleanField(default=False)
-	address = models.TextField(null=True, blank=True)
 	referral_code = models.CharField(max_length=255, null=True, blank=True)
 	nation_id = models.CharField(max_length=20, null=True, blank=True)
 	is_mobile_otp_on = models.BooleanField(default=True)
@@ -81,14 +83,15 @@ class User(AbstractBaseUser, GenericModel, PermissionsMixin):
 		max_length=20,
 		blank=True, null=True
 	)
+	marital_status = models.CharField(
+		max_length=10, choices=MaritalStatus.choices, blank=True, null=True
+	)
+	title = models.CharField(max_length=5, choices=Title.choices, blank=True, null=True)
 	country = CountryField(
 		verbose_name=_("country"), default="KE", blank=False, null=False
 	)
 	city = models.CharField(
-		verbose_name=_("city"),
-		max_length=180,
-		blank=True,
-		null=True,
+		verbose_name=_("city"), max_length=180, blank=True, null=True
 	)
 	mpin = models.CharField(max_length=4, null=True, blank=True)
 	
@@ -103,6 +106,25 @@ class User(AbstractBaseUser, GenericModel, PermissionsMixin):
 	class Meta:
 		verbose_name = _("user")
 		verbose_name_plural = _("users")
+	
+	# Logic to determine the title
+	
+	def determine_title(self):
+		if self.gender == self.Gender.MALE:
+			return self.Title.MR
+		elif self.gender == self.Gender.FEMALE:
+			if self.marital_status == self.MaritalStatus.MARRIED:
+				return self.Title.MRS
+			else:
+				return self.Title.MS
+		return None
+	
+	# Overriding the save method to set the title
+	def save(self, *args, **kwargs):
+		# Set the title if it's not manually provided
+		if not self.title:
+			self.title = self.determine_title()
+		super(User, self).save(*args, **kwargs)
 	
 	def __str__(self):
 		return self.first_name + ' - ' + self.mobile
@@ -136,7 +158,7 @@ class User(AbstractBaseUser, GenericModel, PermissionsMixin):
 	
 	@property
 	def get_mobile_without_plus(self):
-		return f"{self.country_code.replace('+','').title()}{self.mobile.title()}"
+		return f"{self.country_code.replace('+', '').title()}{self.mobile.title()}"
 	
 	@property
 	def get_short_name(self):
@@ -168,3 +190,37 @@ class User(AbstractBaseUser, GenericModel, PermissionsMixin):
 				otp_obj.save()
 				is_verified = True
 		return is_verified
+
+
+class Document(GenericModel):
+	DOCUMENT_TYPE_CHOICES = [
+		('NATIONAL_IDENTITY', 'National Identity'),
+		('FACIAL_PHOTO', 'Facial Photo'),
+	]
+	
+	user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='documents')
+	document_type = models.CharField(max_length=50, choices=DOCUMENT_TYPE_CHOICES)
+	media_type = models.CharField(max_length=50)
+	s3_key = models.CharField(max_length=255)  # Store S3 object key
+	
+	def __str__(self):
+		return f"Document {self.document_type} for {self.user.mobile}"
+
+
+class Address(GenericModel):
+	ADDRESS_TYPE_CHOICES = [
+		('PHYSICAL', 'Physical'),
+		('POSTAL', 'Postal'),
+	]
+	
+	user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='address')
+	address_type = models.CharField(max_length=50, choices=ADDRESS_TYPE_CHOICES, default='PHYSICAL')
+	city = models.CharField(max_length=100)
+	country = CountryField()
+	line1 = models.CharField(max_length=255)
+	line2 = models.CharField(max_length=255, blank=True, null=True)
+	state = models.CharField(max_length=100)
+	code = models.CharField(max_length=20)
+	
+	def __str__(self):
+		return f"Address for {self.user.mobile}"

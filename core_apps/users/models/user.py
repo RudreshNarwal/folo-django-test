@@ -41,10 +41,12 @@ class User(AbstractBaseUser, GenericModel, PermissionsMixin):
 	class Title(models.TextChoices):
 		MR = ("Mr.", _("Mr."))
 		MRS = ("Mrs.", _("Mrs."))
+		MISS = ("Miss", _("Miss"))
 		MS = ("Ms.", _("Ms."))
 		DR = ("Dr.", _("Dr."))
-		PROF = ("Prof.", _("Prof."))
-	
+		CHIEF = ("Chief", _("Chief"))
+		SIR = ("Sir", _("Sir"))
+
 	"""
 	User Model:
 		It contains basic user information required for authentication,

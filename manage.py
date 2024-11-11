@@ -7,7 +7,7 @@ import sys
 def main():
     """Run administrative tasks."""
     #TODO change this in prod
-    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "foloDjango.settings.local")
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "foloDjango.settings.dev")
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:

@@ -9,7 +9,7 @@ import time
 logger = logging.getLogger(__name__)
 
 class DTBService:
-    BASE_URL = 'https://api.astraafrica.co/dev/test-conductor/rest/v1'
+    BASE_URL = 'https://api.astraafrica.co/astra-conductor/rest/v1'
     TENANT_ID = '6749'
     USERNAME = 'kmburu'
     PASSWORD = 'ubuntU*2023'

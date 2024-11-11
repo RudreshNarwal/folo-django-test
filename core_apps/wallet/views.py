@@ -162,7 +162,7 @@ class FinalizeRegistrationAPIView(APIView):
 				)
 				customer_profile.kyc_status = 'APPROVED' if kyc_passed else 'FAILED'
 				customer_profile.kyc_failure_stage = None  # Reset failure stage on success
-				customer_profile.kyc_error_message = None  # Clear error message
+				customer_profile.kyc_error_message = None if kyc_passed else 'Customer is not ratified' # Clear error message
 				customer_profile.save()
 			except (DTBServiceAuthenticationError, DTBServiceAPIError, DTBServiceError) as e:
 				logger.error(f"Error during KYC ratification: {e}")

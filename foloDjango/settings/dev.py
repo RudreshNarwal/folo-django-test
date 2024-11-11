@@ -10,7 +10,7 @@ ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 APP_DIR = ROOT_DIR / 'core_apps'
 
 # Define the path to the .env file
-env_file = ROOT_DIR / '.envs/.production/.django'
+env_file = ROOT_DIR / '.envs/.dev/.django'
 
 # Check if the .env file exists and then read it
 if env_file.is_file():
@@ -48,6 +48,7 @@ LOCAL_APPS = [
 	"core_apps.users",
 	"core_apps.transunion",
 	"core_apps.payments",
+	"core_apps.wallet",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -285,3 +286,7 @@ MPESA_ENDPOINT=env("MPESA_ENDPOINT")
 MPESA_PASSKEY=env("MPESA_PASSKEY")
 MPESA_CLIENT_TOKEN=env("MPESA_CLIENT_TOKEN")
 MPESA_BUSINESS_CODE=env("MPESA_BUSINESS_CODE")
+
+AWS_STORAGE_BUCKET_NAME=env("AWS_STORAGE_BUCKET_NAME")
+AWS_S3_REGION_NAME=env("AWS_S3_REGION_NAME")
+

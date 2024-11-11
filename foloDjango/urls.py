@@ -37,6 +37,8 @@ urlpatterns = [
 	path(settings.ADMIN_URL, admin.site.urls),
 	# path("api/v1/users/me/", CustomUserDetailsView.as_view(), name="user_details"),
 	path('', include(router.urls)),
+    path('api/v1/user/', include('core_apps.users.urls')),
+    path('api/v1/wallet/', include('core_apps.wallet.urls')),
 	path('api/v1/transactions/', UserTransactionsListView.as_view(), name='user-transactions'),
 	path('api/v1/transactions/<int:transaction_id>/', TransactionDetailView.as_view(), name='transaction-detail'),
 	path('api/v1/transactions/<int:transaction_id>/celery-task-test/', TransactionCeleryDetailTest.as_view(), name='transaction-celery-task-detail'),

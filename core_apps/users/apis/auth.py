@@ -10,7 +10,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from core_apps.users.models.user import User
-from core_apps.users.serializers.user import RegisterUserMobileSerializer
+from core_apps.users.serializers.auth import RegisterUserMobileSerializer
 from core_apps.users.serializers.auth import VerifyOTPRequestSerializer
 from django.contrib.auth import get_user_model
 from rest_framework.generics import RetrieveUpdateAPIView

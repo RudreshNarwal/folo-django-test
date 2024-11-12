@@ -214,8 +214,13 @@ class Document(GenericModel):
 
 class Address(GenericModel):
 	ADDRESS_TYPE_CHOICES = [
-		('PHYSICAL', 'Physical'),
+		('PRIMARY', 'Primary'),
 		('POSTAL', 'Postal'),
+		('POSTAL', 'Postal'),
+		('HEADQUARTERS', 'Headquarters'),
+		('OPERATING', 'Operating'),
+		('BRANCH', 'Branch'),
+		('REGISTERED', 'Registered'),
 	]
 	
 	user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='address')

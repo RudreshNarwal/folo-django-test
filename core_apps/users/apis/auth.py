@@ -51,7 +51,7 @@ class AuthView(viewsets.ViewSet):
             user = serializer.save()
             otp = user.send_otp()
             return Response({
-                "is_registered": user.email is not None,
+                "is_registered": user.address.address_type is not None,
                 "message": "Otp sent successfully !!"
             }, status=status.HTTP_201_CREATED)
 

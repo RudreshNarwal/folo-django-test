@@ -215,7 +215,7 @@ class Document(GenericModel):
 class Address(GenericModel):
 	ADDRESS_TYPE_CHOICES = [
 		('PRIMARY', 'Primary'),
-		('POSTAL', 'Postal'),
+		('PHYSICAL', 'Physical'),
 		('POSTAL', 'Postal'),
 		('HEADQUARTERS', 'Headquarters'),
 		('OPERATING', 'Operating'),

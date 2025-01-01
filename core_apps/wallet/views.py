@@ -96,7 +96,7 @@ class FinalizeRegistrationAPIView(APIView):
 
             try:
                 kyc_response = kyc_service.register_customer(customer_data)
-                customer_profile.provider_customer_id = kyc_response.get('customerId')
+                customer_profile.customer_id = kyc_response.get('customerId')
                 customer_profile.save()
             except (DTBServiceAuthenticationError, DTBServiceAPIError, DTBServiceError) as e:
                 return handle_provider_exception(customer_profile, 'Customer Registration', e)
@@ -122,7 +122,7 @@ class FinalizeRegistrationAPIView(APIView):
 
                 try:
                     doc_response = kyc_service.add_document(
-                        customer_profile.provider_customer_id,
+                        customer_profile.customer_id,
                         document_data
                     )
                     ProviderDocument.objects.create(
@@ -150,7 +150,7 @@ class FinalizeRegistrationAPIView(APIView):
                     "code": address.code
                 }
                 try:
-                    kyc_service.add_address(customer_profile.provider_customer_id, address_data)
+                    kyc_service.add_address(customer_profile.customer_id, address_data)
                 except (DTBServiceAuthenticationError, DTBServiceAPIError, DTBServiceError) as e:
                     return handle_provider_exception(customer_profile, 'Address Addition', e)
             except Address.DoesNotExist:
@@ -163,7 +163,7 @@ class FinalizeRegistrationAPIView(APIView):
             customer_profile.save()
 
             try:
-                kyc_result = kyc_service.ratify_kyc(customer_profile.provider_customer_id)
+                kyc_result = kyc_service.ratify_kyc(customer_profile.customer_id)
                 kyc_passed = all(
                     check.get('passed', False)
                     for check in kyc_result.values()

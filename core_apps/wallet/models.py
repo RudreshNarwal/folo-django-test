@@ -28,7 +28,7 @@ class CustomerProfile(models.Model):
 	
 	user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='customer_profile')
 	provider_name = models.CharField(max_length=20, choices=PROVIDER_CHOICES, default='DTB')
-	provider_customer_id = models.IntegerField(null=True, blank=True)
+	customer_id = models.IntegerField(null=True, blank=True)
 	external_unique_id = models.UUIDField(null=True, blank=True)
 	kyc_status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
 	kyc_failure_stage = models.CharField(max_length=100, null=True, blank=True)
@@ -98,7 +98,7 @@ class Wallet(GenericModel):
 	reservations = models.DecimalField(max_digits=20, decimal_places=2, default=0.00, help_text="The reservations placed on the wallet (uncommitted transactions).")
 	account_number = models.CharField(max_length=50, unique=True),
 	friendly_id = models.CharField(max_length=50, unique=True, blank=True, null=True, help_text="A unique reference for a wallet used for deposits and other transactions.")
-	customer_id = models.BigIntegerField(blank=True, null=True)
+	customer = models.ForeignKey(CustomerProfile, on_delete=models.CASCADE, related_name='wallets')
 	organisation_id = models.BigIntegerField(blank=True, null=True,
 		help_text=(
 			"The organisation who owns this wallet. "

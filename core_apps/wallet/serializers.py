@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django_countries.serializers import CountryFieldMixin
-from .models import CustomerProfile, ProviderDocument
+from .models import CustomerProfile, ProviderDocument, Wallet
 
 User = get_user_model()
 
@@ -27,3 +27,14 @@ class ProviderDocumentSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProviderDocument
         fields = ['provider_document_id']
+
+
+class WalletResponseSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Wallet
+        fields = [
+            "account_number", "available_balance", "configuration", "created",
+            "currency", "current_balance", "customer_id", "description",
+            "external_unique_id", "friendly_id", "name", "organisation_id",
+            "reservations", "status", "wallet_id", "wallet_type_id"
+        ]

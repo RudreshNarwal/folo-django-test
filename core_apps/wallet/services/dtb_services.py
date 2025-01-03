@@ -140,6 +140,26 @@ class DTBService:
         url = f'{self.BASE_URL}/tenants/{self.TENANT_ID}/customers/{customer_id}'
         response = self.request_with_retries('GET', url, headers=self.headers)
         return response.json()
+    
+    def search_customers(self, national_identity_number):
+        url = f'{self.BASE_URL}/tenants/{self.TENANT_ID}/customers'
+        params = {
+            'nationalIdentityNumber': national_identity_number
+        }
+        response = self.request_with_retries('GET', url, headers=self.headers, params=params)
+        return response.json()
+    
+    def get_wallet_types(self):
+        url = f'{self.BASE_URL}/tenants/{self.TENANT_ID}/customers/{self.TENANT_ID}/wallet-types'
+        response = self.request_with_retries('GET', url, headers=self.headers)
+        return response.json()
+    
+    def create_wallet(self, customer_id, wallet_data):
+        url = f'{self.BASE_URL}/tenants/{self.TENANT_ID}/customers/{customer_id}/wallets'
+        response = self.request_with_retries('POST', url, json=wallet_data, headers=self.headers)
+        return response.json()
+    
+    
 
 
 class DTBServiceError(Exception):

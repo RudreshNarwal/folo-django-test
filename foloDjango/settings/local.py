@@ -239,6 +239,7 @@ EMAIL_BACKEND = "djcelery_email.backends.CeleryEmailBackend"
 EMAIL_HOST = env("EMAIL_HOST", default="mailhog")
 EMAIL_PORT = env("EMAIL_PORT")
 DEFAULT_FROM_EMAIL = "rudresh@ubuntuonline.co.ke"
+DEFAULT_EMAIL_RECEIVERS = ["rudresh@ubuntuonline.co.ke", "kevin@ubuntuonline.co.ke", "rudresh.narwal20@gmail.com"]
 DOMAIN = env("DOMAIN")
 SITE_NAME = "FoloMoney"
 
@@ -246,6 +247,7 @@ BASE_URL=env("BASE_URL")
 
 TRANSUNION_ENDPOINT=env("TRANSUNION_ENDPOINT")
 TRANSUNION_USERNAME=env("TRANSUNION_USERNAME")
+TRANSUNION_PASSWORD=env("TRANSUNION_PASSWORD")
 TRANSUNION_PASSWORD=env("TRANSUNION_PASSWORD")
 TRANSUNION_CODE=env("TRANSUNION_CODE")
 TRANSUNION_INFINITY_CODE=env("TRANSUNION_INFINITY_CODE")

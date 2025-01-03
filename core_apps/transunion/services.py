@@ -4,7 +4,7 @@ import logging
 import requests
 from django.contrib.auth import get_user_model
 from django.conf import settings
-from django.core.mail import mail_admins
+from django.core.mail import mail_admins, send_mail
 
 from core_apps.transunion.models import CreditReport
 
@@ -36,9 +36,12 @@ def register_with_tu(user):
 		error_message = f"Failed to register with TU. Response Code: {response_code}, User: {user.get_mobile_without_plus}. Also, update user subscription as playment was successful"
 		logging.error(error_message)
 		# Send email to admins
-		mail_admins(
+		send_mail(
 			subject="TransUnion Registration Failed",
-			message=error_message
+			message=error_message,
+			from_email=settings.DEFAULT_FROM_EMAIL,
+			recipient_list=settings.DEFAULT_EMAIL_RECEIVERS,
+			fail_silently=False,
 		)
 	
 	return api_response

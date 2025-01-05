@@ -62,7 +62,7 @@ class FinalizeRegistrationAPIView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
-    @transaction.atomic
+    # @transaction.atomic
     def post(self, request):
         user = request.user
 

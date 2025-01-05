@@ -31,7 +31,7 @@ class DTBService:
             "password": self.PASSWORD
         }
         try:
-            response = self.session.post(url, json=payload, headers=self.headers)
+            response = self.session.post(url, json=payload, headers=self.headers, verify=False)
             response.raise_for_status()
             data = response.json()
 

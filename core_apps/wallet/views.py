@@ -10,7 +10,6 @@ import uuid
 from django.conf import settings
 
 from core_apps.users.models.user import User, Document, Address
-from foloDjango import settings
 from .models import CustomerProfile, ProviderDocument, Wallet, WalletType
 from .serializers import WalletResponseSerializer
 from .services.dtb_services import (
@@ -123,6 +122,9 @@ class FinalizeRegistrationAPIView(APIView):
                     "nationalIdentityNumber": user.nation_id,
                     "title": (user.title or "Mr").replace(".", "").upper()
                 }
+                print(GENDER_MAPPING.get(user.gender.upper()))
+                print(MARITAL_STATUS_MAPPING.get(user.marital_status.upper()))
+                print((user.title or "Mr").replace(".", "").upper())
                 
                 # Validate required fields
                 missing_fields = [key for key, value in customer_data.items() if value is None]
@@ -170,9 +172,9 @@ class FinalizeRegistrationAPIView(APIView):
                         customer_profile.customer_id,
                         document_data
                     )
-                    ProviderDocument.objects.create(
+                    ProviderDocument.objects.update_or_create(
                         document=doc,
-                        provider_document_id=doc_response.get('documentId')
+                        defaults={'provider_document_id': doc_response.get('documentId')}
                     )
                 except (DTBServiceAuthenticationError, DTBServiceAPIError, DTBServiceError) as e:
                     return handle_provider_exception(customer_profile, 'Document Upload', e)
@@ -293,10 +295,9 @@ class CreateCustomerWalletAPIView(APIView):
                 # No allowed wallet type found
                 error_message = "No allowed wallet type found for the customer."
                 logger.error(error_message)
-
                 # Trigger an email notification
                 send_mail(
-                    subject="Wallet Creation Failed",
+                    subject="Error: Wallet Creation Failed",
                     message=f"Failed to create wallet for customer ID {customer_profile.customer_id} as no allowed wallet type was found.",
                     from_email=settings.DEFAULT_FROM_EMAIL,
                     recipient_list=settings.DEFAULT_EMAIL_RECEIVERS,

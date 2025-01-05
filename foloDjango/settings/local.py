@@ -238,7 +238,7 @@ AWS_SECRET_ACCESS_KEY = env("AWS_SECRET_ACCESS_KEY")
 EMAIL_BACKEND = "djcelery_email.backends.CeleryEmailBackend"
 EMAIL_HOST = env("EMAIL_HOST", default="mailhog")
 EMAIL_PORT = env("EMAIL_PORT")
-DEFAULT_FROM_EMAIL = "rudresh@ubuntuonline.co.ke"
+DEFAULT_FROM_EMAIL = "Folo Money Dev <rudresh@ubuntuonline.co.ke>"
 DEFAULT_EMAIL_RECEIVERS = ["rudresh@ubuntuonline.co.ke", "kevin@ubuntuonline.co.ke", "rudresh.narwal20@gmail.com"]
 DOMAIN = env("DOMAIN")
 SITE_NAME = "FoloMoney"

@@ -257,8 +257,9 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 DEFAULT_FROM_EMAIL = env(
     "DJANGO_DEFAULT_FROM_EMAIL",
-    default="FoloMoney Support <rudresh@ubuntuonline.co.ke>",
+    default="FoloMoney Dev <rudresh@ubuntuonline.co.ke>",
 )
+DEFAULT_EMAIL_RECEIVERS = ["rudresh@ubuntuonline.co.ke", "kevin@ubuntuonline.co.ke", "rudresh.narwal20@gmail.com"]
 
 SITE_NAME = "FoloMoney"
 
@@ -268,8 +269,6 @@ EMAIL_SUBJECT_PREFIX = env(
     "DJANGO_EMAIL_SUBJECT_PREFIX",
     default="[FoloMoney]",
 )
-DEFAULT_FROM_EMAIL = "rudresh@ubuntuonline.co.ke"
-DEFAULT_EMAIL_RECEIVERS = ["rudresh@ubuntuonline.co.ke", "kevin@ubuntuonline.co.ke", "rudresh.narwal20@gmail.com"]
 EMAIL_BACKEND = 'django_ses.SESBackend'
 AWS_ACCESS_KEY_ID = env("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = env("AWS_SECRET_ACCESS_KEY")

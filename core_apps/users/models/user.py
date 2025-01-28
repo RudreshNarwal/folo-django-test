@@ -197,6 +197,7 @@ class User(AbstractBaseUser, GenericModel, PermissionsMixin):
 class Document(GenericModel):
 	DOCUMENT_TYPE_CHOICES = [
 		('NATIONAL_IDENTITY', 'National Identity'),
+		('NATIONAL_IDENTITY_BACK', 'National Identity Back'),
 		('FACIAL_PHOTO', 'Facial Photo'),
 	]
 	

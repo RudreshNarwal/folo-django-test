@@ -18,11 +18,14 @@ from ..serializers.user import (
 	DocumentSerializer,
 	AddressSerializer
 )
-from ..models.user import Document, Address
+from ..models.user import Document, Address, UserTask
 from django.db import transaction
 from rest_framework.decorators import action
 import uuid
 import logging
+from rest_framework.views import APIView
+from celery.result import AsyncResult
+from ..tasks import analyze_id_images
 
 logger = logging.getLogger(__name__)
 
@@ -198,4 +201,100 @@ class SaveAddressAPIView(generics.UpdateAPIView):
 				"status": "error",
 				"message": "An unexpected error occurred during address save.",
 				"errors": str(e)
+			}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class AnalyzeIDView(APIView):
+	permission_classes = [IsAuthenticated]
+	
+	def post(self, request):
+		try:
+			# Attempt to get both front and back ID documents
+			front_doc = Document.objects.get(
+				user=request.user,
+				document_type='NATIONAL_IDENTITY'
+			)
+			back_doc = Document.objects.get(
+				user=request.user,
+				document_type='NATIONAL_IDENTITY_BACK'
+			)
+			
+			# Check if S3 keys are present
+			if not front_doc.s3_key or not back_doc.s3_key:
+				return Response({
+					"message": "Missing S3 key for front and/or back document."
+				}, status=status.HTTP_404_NOT_FOUND)
+			
+			# Create UserTask instance first
+			task_id = str(uuid.uuid4())
+			user_task = UserTask.objects.create(
+				user=request.user,
+				task_id=task_id,
+				task_type='NATIONAL_ID_DATA_EXTRACTION',
+				status='PROCESSING'
+			)
+			
+			# Launch Celery task with task_id and S3 keys
+			celery_task = analyze_id_images.delay(
+				task_id,
+				front_doc.s3_key,
+				back_doc.s3_key
+			)
+			
+			return Response({
+				"message": "ID analysis task scheduled.",
+				"task_id": task_id,
+				"status": "processing"
+			}, status=status.HTTP_202_ACCEPTED)
+		
+		except Document.DoesNotExist:
+			return Response({
+				"message": "Required front/back ID documents not found."
+			}, status=status.HTTP_404_NOT_FOUND)
+		
+		except Exception as e:
+			logger.error(f"Error initiating ID analysis: {str(e)}")
+			return Response({
+				"message": "Error initiating analysis",
+				"error": str(e)
+			}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class CheckAnalysisStatus(APIView):
+	permission_classes = [IsAuthenticated]
+	
+	def get(self, request, task_id):
+		try:
+			# Get the task from UserTask model
+			user_task = UserTask.objects.get(
+				task_id=task_id,
+				user=request.user  # Ensure user can only check their own tasks
+			)
+			
+			response_data = {
+				"task_id": task_id,
+				"status": user_task.status,
+				"started_at": user_task.started_at,
+				"completed_at": user_task.completed_at,
+				"task_type": user_task.task_type
+			}
+			
+			# Add result or error message based on status
+			if user_task.status == 'COMPLETED':
+				response_data["result"] = user_task.result
+			elif user_task.status == 'FAILED':
+				response_data["error"] = user_task.error_message
+			
+			return Response(response_data)
+			
+		except UserTask.DoesNotExist:
+			return Response({
+				"message": "Task not found or you don't have permission to view it"
+			}, status=status.HTTP_404_NOT_FOUND)
+			
+		except Exception as e:
+			logger.error(f"Error checking task status: {str(e)}")
+			return Response({
+				"message": "Error checking task status",
+				"error": str(e)
 			}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

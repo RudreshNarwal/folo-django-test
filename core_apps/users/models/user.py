@@ -99,7 +99,7 @@ class User(AbstractBaseUser, GenericModel, PermissionsMixin):
 	
 	USERNAME_FIELD = "mobile"  # so that mobile field can be used for authentication
 	
-	REQUIRED_FIELDS = ["first_name", "last_name", "email"]
+	REQUIRED_FIELDS = ["first_name", "last_name"]
 	
 	objects = CustomUserManager()
 	
@@ -234,3 +234,48 @@ class Address(GenericModel):
 	
 	def __str__(self):
 		return f"Address for {self.user.mobile}"
+
+
+class UserTask(GenericModel):
+	STATUS_CHOICES = [
+		('PENDING', 'Pending'),
+		('PROCESSING', 'Processing'),
+		('COMPLETED', 'Completed'),
+		('FAILED', 'Failed')
+	]
+
+	TASK_TYPE_CHOICES = [
+		('NATIONAL_ID_DATA_EXTRACTION', 'National ID Data Extraction'),
+		# Add other task types as needed
+	]
+
+	user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='tasks')
+	task_id = models.CharField(max_length=255, unique=True)
+	task_type = models.CharField(max_length=50, choices=TASK_TYPE_CHOICES)
+	status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+	result = models.JSONField(null=True, blank=True)
+	error_message = models.TextField(null=True, blank=True)
+	started_at = models.DateTimeField(auto_now_add=True)
+	completed_at = models.DateTimeField(null=True, blank=True)
+
+	class Meta:
+		ordering = ['-started_at']
+		indexes = [
+			models.Index(fields=['user', 'task_type', 'status']),
+			models.Index(fields=['task_id']),
+		]
+
+	def __str__(self):
+		return f"{self.task_type} - {self.status} for {self.user.mobile}"
+
+	def mark_completed(self, result):
+		self.status = 'COMPLETED'
+		self.result = result
+		self.completed_at = timezone.now()
+		self.save()
+
+	def mark_failed(self, error_message):
+		self.status = 'FAILED'
+		self.error_message = error_message
+		self.completed_at = timezone.now()
+		self.save()

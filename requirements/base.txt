@@ -23,3 +23,5 @@ django-elasticsearch-dsl-drf==0.22.5
 boto3
 django-celery-beat
 django_celery_results
+openai
+pydantic

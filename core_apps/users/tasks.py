@@ -124,6 +124,7 @@ def analyze_id_images(self, task_id: str, front_s3_key: str, back_s3_key: str):
                     
                     # Set national ID
                     user.nation_id = extracted_data.nation_id
+                    user.district_of_birth = extracted_data.district_of_birth
                     
                     # Save the user
                     user.save()

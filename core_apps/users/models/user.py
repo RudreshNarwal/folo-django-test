@@ -95,6 +95,9 @@ class User(AbstractBaseUser, GenericModel, PermissionsMixin):
 	city = models.CharField(
 		verbose_name=_("city"), max_length=180, blank=True, null=True
 	)
+	district_of_birth = models.CharField(
+		verbose_name=_("district_of_birth"), max_length=180, blank=True, null=True
+	)
 	mpin = models.CharField(max_length=4, null=True, blank=True)
 	
 	USERNAME_FIELD = "mobile"  # so that mobile field can be used for authentication

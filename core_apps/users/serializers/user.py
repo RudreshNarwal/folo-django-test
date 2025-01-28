@@ -110,7 +110,7 @@ class UserSerializer(serializers.ModelSerializer):
 		model = User
 		fields = [
 			'pkid', 'id', 'first_name', 'middle_name', 'last_name', "dob", "mobile", 'is_mobile_verified', 'email', "gender", "nation_id",
-			"is_email_verified", "country_code", "marital_status", "country", "city", "title", "documents", "address"
+			"is_email_verified", "country_code", "marital_status", "country", "city", "title", "documents", "address", "district_of_birth"
 		]
 	
 	def validate_mobile(self, value):

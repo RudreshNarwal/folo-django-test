@@ -25,6 +25,8 @@ import uuid
 import logging
 from rest_framework.views import APIView
 from celery.result import AsyncResult
+
+from ..services.id_analysis import IDAnalysisService
 from ..tasks import analyze_id_images
 
 logger = logging.getLogger(__name__)
@@ -205,6 +207,10 @@ class SaveAddressAPIView(generics.UpdateAPIView):
 
 
 class AnalyzeIDView(APIView):
+	"""
+	Asynchronous endpoint that creates a task for ID analysis.
+	Use this in production for better user experience.
+	"""
 	permission_classes = [IsAuthenticated]
 	
 	def post(self, request):
@@ -224,15 +230,8 @@ class AnalyzeIDView(APIView):
 					"status": "completed"
 				}, status=status.HTTP_200_OK)
 			
-			# Attempt to get both front and back ID documents
-			front_doc = Document.objects.get(
-				user=request.user,
-				document_type='NATIONAL_IDENTITY'
-			)
-			back_doc = Document.objects.get(
-				user=request.user,
-				document_type='NATIONAL_IDENTITY_BACK'
-			)
+			# Get documents using service
+			front_doc, back_doc = IDAnalysisService.get_id_documents(request.user)
 			
 			# Check if S3 keys are present
 			if not front_doc.s3_key or not back_doc.s3_key:
@@ -271,6 +270,72 @@ class AnalyzeIDView(APIView):
 			logger.error(f"Error initiating ID analysis: {str(e)}")
 			return Response({
 				"message": "Error initiating analysis",
+				"error": str(e)
+			}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class TestAnalyzeIDView(APIView):
+	"""
+	Synchronous endpoint for testing ID analysis.
+	Use this only for testing purposes as it may timeout for long-running analyses.
+	"""
+	permission_classes = [IsAuthenticated]
+	
+	def post(self, request):
+		try:
+			# Check if the task already exists and is completed
+			existing_task = UserTask.objects.filter(
+				user=request.user,
+				task_type='NATIONAL_ID_DATA_EXTRACTION',
+				status='COMPLETED'
+			).first()
+			
+			if existing_task and request.user.nation_id:  # Check both if task exists and nation_id is not empty
+				# If the task is already completed and the nation_id is not null or empty, return success response
+				return Response({
+					"message": "ID analysis has already been completed.",
+					"task_id": existing_task.task_id,
+					"status": "completed"
+				}, status=status.HTTP_200_OK)
+			
+			# Get documents using service
+			front_doc, back_doc = IDAnalysisService.get_id_documents(request.user)
+			
+			# Analyze images using service
+			extracted_data = IDAnalysisService.analyze_id_images(
+				front_doc.s3_key,
+				back_doc.s3_key
+			)
+			
+			# Update user data using service
+			IDAnalysisService.update_user_data(request.user, extracted_data)
+
+			return Response({
+				"message": "ID analysis completed successfully",
+				"data": extracted_data.dict()
+			}, status=status.HTTP_200_OK)
+
+		except Document.DoesNotExist:
+			return Response({
+				"message": "Required front/back ID documents not found."
+			}, status=status.HTTP_404_NOT_FOUND)
+			
+		except ValueError as e:
+			return Response({
+				"message": str(e)
+			}, status=status.HTTP_400_BAD_REQUEST)
+			
+		except json.JSONDecodeError as e:
+			logger.error(f"Error parsing OpenAI response: {str(e)}")
+			return Response({
+				"message": "Error parsing ID data",
+				"error": str(e)
+			}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+			
+		except Exception as e:
+			logger.error(f"Error analyzing ID: {str(e)}")
+			return Response({
+				"message": "Error analyzing ID",
 				"error": str(e)
 			}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 

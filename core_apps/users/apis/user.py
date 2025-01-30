@@ -209,6 +209,21 @@ class AnalyzeIDView(APIView):
 	
 	def post(self, request):
 		try:
+			# Check if the task already exists and is completed
+			existing_task = UserTask.objects.filter(
+				user=request.user,
+				task_type='NATIONAL_ID_DATA_EXTRACTION',
+				status='COMPLETED'
+			).first()
+			
+			if existing_task and request.user.nation_id:  # Check both if task exists and nation_id is not empty
+				# If the task is already completed and the nation_id is not null or empty, return success response
+				return Response({
+					"message": "ID analysis has already been completed.",
+					"task_id": existing_task.task_id,
+					"status": "completed"
+				}, status=status.HTTP_200_OK)
+			
 			# Attempt to get both front and back ID documents
 			front_doc = Document.objects.get(
 				user=request.user,
@@ -286,12 +301,12 @@ class CheckAnalysisStatus(APIView):
 				response_data["error"] = user_task.error_message
 			
 			return Response(response_data)
-			
+		
 		except UserTask.DoesNotExist:
 			return Response({
 				"message": "Task not found or you don't have permission to view it"
 			}, status=status.HTTP_404_NOT_FOUND)
-			
+		
 		except Exception as e:
 			logger.error(f"Error checking task status: {str(e)}")
 			return Response({

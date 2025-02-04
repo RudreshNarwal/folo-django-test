@@ -176,7 +176,7 @@ class FinalizeRegistrationAPIView(APIView):
 			
 			documents = Document.objects.filter(
 				user=user,
-				document_type__in=['NATIONAL_IDENTITY', 'FACIAL_PHOTO']
+				document_type__in=['NATIONAL_IDENTITY', 'FACIAL_PHOTO', 'BACK_OF_NATIONAL_IDENTITY']
 			)
 			
 			for doc in documents:
@@ -273,7 +273,7 @@ class FinalizeRegistrationAPIView(APIView):
 						fail_silently=False,
 					)
 					return Response({
-						"message": "KYC failed.",
+						"message": f"KYC failed. Failed at {customer_profile.kyc_status}. Failed Check {failed_checks}",
 						"kyc_status": customer_profile.kyc_status,
 						"failed_checks": failed_checks
 					}, status=status.HTTP_400_BAD_REQUEST)

@@ -10,7 +10,7 @@ import uuid
 from django.conf import settings
 
 from core_apps.users.models.user import User, Document, Address
-from .models import CustomerProfile, ProviderDocument, Wallet, WalletType
+from .models import CardType, CustomerProfile, ProviderDocument, Wallet, WalletType
 from .serializers import WalletResponseSerializer
 from .services.dtb_services import (
 	DTBService,
@@ -377,11 +377,27 @@ class CreateCustomerWalletAPIView(APIView):
 			
 			logger.debug(f"Wallet payload for creation: {wallet_payload}")
 			
+			
 			# ---------------------------
-			# Create Wallet via DTB API
+			# Check for Existing Active Wallet, if not then creating
 			# ---------------------------
-			wallet_response = kyc_service.create_wallet(customer_profile.customer_id, wallet_payload)
-			logger.info(f"Wallet created with externalUniqueId: {wallet_response.get('externalUniqueId')}")
+			try:
+				dtb_wallets = kyc_service.get_wallets(customer_profile.customer_id)
+				existing_wallets = [
+					wallet for wallet in dtb_wallets
+					if wallet.get('walletTypeId') == selected_wallet_type_id and wallet.get('status') == 'ACTIVE'
+				]
+			except Exception as e:
+				logger.error("Error while checking for existing wallets: %s", e)
+				existing_wallets = []
+			
+			if existing_wallets:
+				# Use the first matching wallet from DTB
+				wallet_response = existing_wallets[0]
+			else:
+				# Create a new wallet via DTB API
+				wallet_response = kyc_service.create_wallet(customer_profile.customer_id, wallet_payload)
+			
 			
 			# ---------------------------
 			# Update Database
@@ -397,34 +413,35 @@ class CreateCustomerWalletAPIView(APIView):
 					"error": f"WalletType with ID {wallet_type_id} does not exist locally."
 				}, status=status.HTTP_400_BAD_REQUEST)
 			
-			# Create the Wallet instance
-			wallet = Wallet.objects.create(
-				user=user,
-				external_unique_id=uuid.UUID(wallet_response.get('externalUniqueId')),
+			# Update or create the local Wallet record
+			wallet, created = Wallet.objects.update_or_create(
 				wallet_id=wallet_response.get('walletId'),
-				wallet_type=wallet_type,
-				name=wallet_response.get('name'),
-				description=wallet_response.get('description'),
-				card_type=wallet_response.get('cardType'),
-				status=wallet_response.get('status'),
-				currency=wallet_response.get('currency'),
-				available_balance=wallet_response.get('availableBalance'),
-				current_balance=wallet_response.get('currentBalance'),
-				reservations=wallet_response.get('reservations'),
-				account_number=wallet_response.get('accountNumber'),
-				friendly_id=wallet_response.get('friendlyId'),
-				customer=customer_profile,
-				organisation_id=wallet_response.get('organisationId'),
-				configuration=wallet_response.get('configuration')
+				defaults={
+					'user': user,
+					'external_unique_id': uuid.UUID(wallet_response.get('externalUniqueId')),
+					'wallet_type': wallet_type,
+					'name': wallet_response.get('name'),
+					'description': wallet_response.get('description'),
+					'card_type': wallet_response.get('cardType') or CardType.VIRTUAL,
+					'status': wallet_response.get('status'),
+					'currency': wallet_response.get('currency'),
+					'available_balance': wallet_response.get('availableBalance'),
+					'current_balance': wallet_response.get('currentBalance'),
+					'reservations': wallet_response.get('reservations'),
+					'account_number': wallet_response.get('accountNumber'),
+					'friendly_id': wallet_response.get('friendlyId'),
+					'customer': customer_profile,
+					'organisation_id': wallet_response.get('organisationId'),
+					'configuration': wallet_response.get('configuration')
+				}
 			)
-			
 			logger.info(f"Wallet {wallet.id} created locally for user {user.id}.")
 			
 			# Serialize the wallet data for response
 			response_serializer = WalletResponseSerializer(wallet)
 			
 			return Response({
-				"message": "Wallet created successfully.",
+				"message": "Wallet created successfully." if created else "Existing wallet used.",
 				"wallet": response_serializer.data
 			}, status=status.HTTP_201_CREATED)
 		

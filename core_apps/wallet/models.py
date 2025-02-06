@@ -90,13 +90,13 @@ class Wallet(GenericModel):
 	wallet_type = models.ForeignKey(WalletType, on_delete=models.PROTECT, related_name='wallets')
 	name = models.CharField(max_length=50, validators=[MinLengthValidator(3), MaxLengthValidator(50)], help_text="Name of the Wallet. Possible values: >= 3 characters and <= 50 characters.")
 	description = models.CharField(max_length=200, blank=True, null=True, validators=[MaxLengthValidator(200)])
-	card_type = models.CharField(max_length=20, choices=CardType.choices)
+	card_type = models.CharField(max_length=20, choices=CardType.choices, default=CardType.VIRTUAL)
 	status = models.CharField(max_length=20, choices=WalletStatus.choices, default=WalletStatus.ACTIVE)
 	currency = models.CharField(max_length=3, default='KES',validators=[RegexValidator(regex=r'^[A-Z]{3}$', message="Currency must be a 3-letter ISO code.")])
 	available_balance = models.DecimalField(max_digits=20, decimal_places=2, default=0.00, validators=[MinValueValidator(0)])
 	current_balance = models.DecimalField(max_digits=20, decimal_places=2, default=0.00, validators=[MinValueValidator(0)], help_text="The balance in the wallet in the currency of the wallet")
 	reservations = models.DecimalField(max_digits=20, decimal_places=2, default=0.00, help_text="The reservations placed on the wallet (uncommitted transactions).")
-	account_number = models.CharField(max_length=50, unique=True),
+	account_number = models.CharField(max_length=50, unique=True, blank=True, null=True, help_text="A unique account number for the wallet.")
 	friendly_id = models.CharField(max_length=50, unique=True, blank=True, null=True, help_text="A unique reference for a wallet used for deposits and other transactions.")
 	customer = models.ForeignKey(CustomerProfile, on_delete=models.CASCADE, related_name='wallets')
 	organisation_id = models.BigIntegerField(blank=True, null=True,

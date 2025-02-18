@@ -138,7 +138,7 @@ class FinalizeRegistrationAPIView(APIView):
 					"gender": GENDER_MAPPING.get(user.gender.upper()) if user.gender else None,
 					# "maritalStatus": MARITAL_STATUS_MAPPING.get(user.marital_status.upper()) if user.marital_status else None,
 					"birthCountry": user.country.code if user.country else None,
-					"birthCity": user.city,
+					"birthCity": user.district_of_birth,
 					"nationalIdentityNumber": user.nation_id,
 					"title": (user.title or "Mr").replace(".", "").upper()
 				}

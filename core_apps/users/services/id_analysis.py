@@ -127,6 +127,7 @@ class IDAnalysisService:
 		# Set national ID and district
 		user.nation_id = extracted_data.nation_id
 		user.district_of_birth = extracted_data.district_of_birth
+		user.city = extracted_data.district_of_birth
 		
 		# Save the user
 		user.save()

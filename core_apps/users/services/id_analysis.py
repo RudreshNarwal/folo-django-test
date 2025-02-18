@@ -42,7 +42,7 @@ class IDAnalysisService:
 		)
 		back_doc = Document.objects.get(
 			user=user,
-			document_type='NATIONAL_IDENTITY_BACK'
+			document_type='BACK_OF_NATIONAL_IDENTITY'
 		)
 		
 		if not front_doc.s3_key or not back_doc.s3_key:

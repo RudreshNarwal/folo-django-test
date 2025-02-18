@@ -136,15 +136,12 @@ class FinalizeRegistrationAPIView(APIView):
 					"phone1": f"{user.country_code.replace('+', '')}{user.mobile}",
 					"status": "ACTIVE",
 					"gender": GENDER_MAPPING.get(user.gender.upper()) if user.gender else None,
-					"maritalStatus": MARITAL_STATUS_MAPPING.get(user.marital_status.upper()) if user.marital_status else None,
+					# "maritalStatus": MARITAL_STATUS_MAPPING.get(user.marital_status.upper()) if user.marital_status else None,
 					"birthCountry": user.country.code if user.country else None,
 					"birthCity": user.city,
 					"nationalIdentityNumber": user.nation_id,
 					"title": (user.title or "Mr").replace(".", "").upper()
 				}
-				print(GENDER_MAPPING.get(user.gender.upper()))
-				print(MARITAL_STATUS_MAPPING.get(user.marital_status.upper()))
-				print((user.title or "Mr").replace(".", "").upper())
 				
 				# Validate required fields
 				missing_fields = [key for key, value in customer_data.items() if value is None]

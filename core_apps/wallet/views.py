@@ -3,15 +3,17 @@ from django.core.mail import send_mail
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework import status
+from rest_framework import status, generics
+from rest_framework.pagination import PageNumberPagination
 from django.db import transaction
 import logging
 import uuid
 from django.conf import settings
 
+
 from core_apps.users.models.user import User, Document, Address
-from .models import CardType, CustomerProfile, ProviderDocument, Wallet, WalletType
-from .serializers import WalletResponseSerializer
+from .models import CardType, CustomerProfile, ProviderDocument, TopUpTransaction, Wallet, WalletType
+from .serializers import TopUpTransactionSerializer, WalletResponseSerializer, WalletSerializer
 from .services.dtb_services import (
 	DTBService,
 	DTBServiceError,
@@ -374,7 +376,6 @@ class CreateCustomerWalletAPIView(APIView):
 			
 			logger.debug(f"Wallet payload for creation: {wallet_payload}")
 			
-			
 			# ---------------------------
 			# Check for Existing Active Wallet, if not then creating
 			# ---------------------------
@@ -394,7 +395,6 @@ class CreateCustomerWalletAPIView(APIView):
 			else:
 				# Create a new wallet via DTB API
 				wallet_response = kyc_service.create_wallet(customer_profile.customer_id, wallet_payload)
-			
 			
 			# ---------------------------
 			# Update Database
@@ -450,3 +450,133 @@ class CreateCustomerWalletAPIView(APIView):
 				"message": "Wallet creation failed.",
 				"error": str(e)
 			}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class TopUpMoneyAPIView(APIView):
+	permission_classes = [IsAuthenticated]
+	
+	def post(self, request):
+		user = request.user
+		try:
+			wallet = Wallet.objects.get(user=user, status='ACTIVE')
+		except Wallet.DoesNotExist:
+			return Response({"error": "No active wallet found."}, status=status.HTTP_400_BAD_REQUEST)
+		
+		amount = request.data.get('amount')
+		if not amount or not isinstance(amount, (int, float)) or amount < 10 or amount > 150000:
+			return Response({"error": "Invalid amount. Must be between 10 and 150,000."}, status=status.HTTP_400_BAD_REQUEST)
+		
+		currency = request.data.get('currency', 'KES')
+		phone = user.get_mobile_without_plus
+		description = request.data.get('description', 'Top Up Money')
+		external_unique_id = uuid.uuid4()
+		callback_url = settings.WEBHOOK_URL
+		
+		payload = {
+			"additionalFields": [{"id": "merchantWalletId", "value": str(wallet.wallet_id)}],
+			"amount": amount,
+			"currency": currency,
+			"externalUniqueId": str(external_unique_id),
+			"callbackUrl": callback_url,
+			"externalWalletId": phone,
+			"phone": phone,
+			"externalWalletType": "SFCM",
+			"description": description,
+			"type": "KE_DTB_STK_PUSH"
+		}
+		
+		kyc_service = DTBService()
+		try:
+			response = kyc_service.initiate_top_up(payload)
+			transaction = TopUpTransaction.objects.create(
+				payment_id=response['paymentId'],
+				external_unique_id=external_unique_id,
+				status=response['status'],
+				amount=response['amount'],
+				currency=response['currency'],
+				description=response['description'],
+				merchant_name=response['merchantName'],
+				payment_type=response['paymentType'],
+				created_at=response['created'],
+				extra_info=response.get('extraInfo'),
+				payment_instrument_info=response['paymentInstrumentInfo'],
+				fee=response['fee'],
+				wallet=wallet,
+				customer=user.customer_profile,
+			)
+			return Response({
+				"message": "Top-up initiated successfully.",
+				"transaction": {
+					"payment_id": transaction.payment_id,
+					"status": transaction.status,
+					"amount": float(transaction.amount),
+					"currency": transaction.currency,
+				}
+			}, status=status.HTTP_201_CREATED)
+		except DTBServiceAPIError as e:
+			logger.error(f"DTB API Error during top-up: {e}")
+			return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+		except Exception as e:
+			logger.error(f"Unexpected error during top-up: {e}")
+			return Response({"error": "An unexpected error occurred."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class TopUpWebhookAPIView(APIView):
+	def post(self, request):
+		data = request.data
+		payment_id = data.get('paymentId')
+		status = data.get('status')
+		error_description = data.get('errorDescription')
+		
+		try:
+			transaction = TopUpTransaction.objects.get(payment_id=payment_id)
+			transaction.status = status
+			if status == 'ERROR_PERM':
+				transaction.error_description = error_description
+			transaction.payment_reference = data.get('paymentReference', '')
+			transaction.save()
+			
+			if status == 'SUCCESSFUL':
+				kyc_service = DTBService()
+				wallet_details = kyc_service.get_wallet_details(transaction.wallet.wallet_id)
+				wallet = transaction.wallet
+				wallet.available_balance = wallet_details['availableBalance']
+				wallet.current_balance = wallet_details['currentBalance']
+				wallet.save()
+				logger.info(f"Wallet {wallet.wallet_id} balance updated successfully.")
+			
+			return Response({"message": "Webhook received and processed."}, status=status.HTTP_200_OK)
+		except TopUpTransaction.DoesNotExist:
+			logger.error(f"Webhook received for unknown payment_id: {payment_id}")
+			return Response({"error": "Transaction not found."}, status=status.HTTP_404_NOT_FOUND)
+		except Exception as e:
+			logger.error(f"Error processing webhook for payment_id {payment_id}: {e}")
+			return Response({"error": "An unexpected error occurred."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class UserWalletAPIView(APIView):
+	permission_classes = [IsAuthenticated]
+	
+	def get(self, request):
+		try:
+			wallet = Wallet.objects.get(user=request.user, status='ACTIVE')
+			serializer = WalletSerializer(wallet)
+			return Response(serializer.data, status=status.HTTP_200_OK)
+		except Wallet.DoesNotExist:
+			return Response({"error": "No active wallet found."}, status=status.HTTP_404_NOT_FOUND)
+
+
+class TransactionHistoryPagination(PageNumberPagination):
+	page_size = 10
+	page_size_query_param = 'page_size'
+	max_page_size = 100
+
+
+class WalletTransactionHistoryAPIView(generics.ListAPIView):
+	permission_classes = [IsAuthenticated]
+	serializer_class = TopUpTransactionSerializer
+	pagination_class = TransactionHistoryPagination
+	
+	def get_queryset(self):
+		wallet = Wallet.objects.get(user=self.request.user, status='ACTIVE')
+		return TopUpTransaction.objects.filter(wallet=wallet).order_by('-created_at')

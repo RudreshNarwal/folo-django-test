@@ -262,3 +262,5 @@ AWS_S3_REGION_NAME=env("AWS_S3_REGION_NAME")
 
 # Add to your environment variables and settings
 OPENAI_API_KEY = env("OPENAI_API_KEY")
+
+ADD_MONEY_WEBHOOK_URL = env("ADD_MONEY_WEBHOOK_URL")

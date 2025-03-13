@@ -470,7 +470,7 @@ class TopUpMoneyAPIView(APIView):
 		phone = user.get_mobile_without_plus
 		description = request.data.get('description', 'Top Up Money')
 		external_unique_id = uuid.uuid4()
-		callback_url = settings.WEBHOOK_URL
+		callback_url = settings.ADD_MONEY_WEBHOOK_URL
 		
 		payload = {
 			"additionalFields": [{"id": "merchantWalletId", "value": str(wallet.wallet_id)}],

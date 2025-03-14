@@ -169,6 +169,11 @@ class DTBService:
         response = self.request_with_retries('POST', url, json=payload, headers=self.headers)
         return response.json()
     
+    def get_top_up_status(self, wallet_id, payment_id):
+        url = f'{self.BASE_URL}/tenants/{self.TENANT_ID}/wallets/{wallet_id}/topups/{payment_id}'
+        response = self.request_with_retries('GET', url, headers=self.headers)
+        return response.json()
+    
     def get_wallet_details(self, wallet_id):
         url = f'{self.BASE_URL}/tenants/{self.TENANT_ID}/wallets/{wallet_id}'
         response = self.request_with_retries('GET', url, headers=self.headers)

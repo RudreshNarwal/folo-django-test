@@ -10,7 +10,6 @@ import logging
 import uuid
 from django.conf import settings
 
-
 from core_apps.users.models.user import User, Document, Address
 from .models import CardType, CustomerProfile, ProviderDocument, TopUpTransaction, Wallet, WalletType
 from .serializers import TopUpTransactionSerializer, WalletResponseSerializer, WalletSerializer
@@ -552,6 +551,21 @@ class TopUpWebhookAPIView(APIView):
 		except Exception as e:
 			logger.error(f"Error processing webhook for payment_id {payment_id}: {e}")
 			return Response({"error": "An unexpected error occurred."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class TopUpStatusAPIView(APIView):
+	permission_classes = [IsAuthenticated]
+	
+	def get(self, request, wallet_id, payment_id):
+		try:
+			dtb_service = DTBService()
+			status_response = dtb_service.get_top_up_status(wallet_id, payment_id)
+			return Response(status_response)
+		except Exception as e:
+			return Response({
+				'status': 'error',
+				'message': str(e)
+			}, status=500)
 
 
 class UserWalletAPIView(APIView):

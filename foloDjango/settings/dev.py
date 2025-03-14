@@ -231,7 +231,7 @@ ADMINS = [("Rudresh Narwal", "rudresh@ubuntuonline.co.ke")]
 CSRF_TRUSTED_ORIGINS = ["https://folo.money"]  # for local CSRF_TRUSTED_ORIGINS = ["http://localhost:8080"]
 SECRET_KEY = env("DJANGO_SECRET_KEY")
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["folo.money"]) + ["localhost", "0.0.0.0",
-                                                                            "127.0.0.1"]  # for local ALLOWED_HOSTS = ["localhost", "0.0.0.0", "127.0.0.1"]
+                                                                            "127.0.0.1", "api.astraafrica.co"]  # for local ALLOWED_HOSTS = ["localhost", "0.0.0.0", "127.0.0.1"]
 CORS_ALLOW_ALL_ORIGINS = True  # set false for prod TODO
 CORS_ALLOW_CREDENTIALS = True  # set false for prod TODO
 ADMIN_URL = env("DJANGO_ADMIN_URL")
@@ -294,3 +294,4 @@ AWS_S3_REGION_NAME = env("AWS_S3_REGION_NAME")
 OPENAI_API_KEY = env("OPENAI_API_KEY")
 
 ADD_MONEY_WEBHOOK_URL = env("ADD_MONEY_WEBHOOK_URL")
+REQUESTS_VERIFY_SSL = True

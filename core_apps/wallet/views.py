@@ -524,18 +524,18 @@ class TopUpWebhookAPIView(APIView):
 	def post(self, request):
 		data = request.data
 		payment_id = data.get('paymentId')
-		status = data.get('status')
+		topup_status = data.get('status')
 		error_description = data.get('errorDescription')
 		
 		try:
 			transaction = TopUpTransaction.objects.get(payment_id=payment_id)
-			transaction.status = status
+			transaction.status = topup_status
 			if status == 'ERROR_PERM':
 				transaction.error_description = error_description
 			transaction.payment_reference = data.get('paymentReference', '')
 			transaction.save()
 			
-			if status == 'SUCCESSFUL':
+			if topup_status == 'SUCCESSFUL':
 				kyc_service = DTBService()
 				wallet_details = kyc_service.get_wallet_details(transaction.wallet.wallet_id)
 				wallet = transaction.wallet
@@ -543,7 +543,6 @@ class TopUpWebhookAPIView(APIView):
 				wallet.current_balance = wallet_details['currentBalance']
 				wallet.save()
 				logger.info(f"Wallet {wallet.wallet_id} balance updated successfully.")
-			
 			return Response({"message": "Webhook received and processed."}, status=status.HTTP_200_OK)
 		except TopUpTransaction.DoesNotExist:
 			logger.error(f"Webhook received for unknown payment_id: {payment_id}")

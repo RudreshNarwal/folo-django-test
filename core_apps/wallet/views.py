@@ -533,7 +533,7 @@ class TopUpWebhookAPIView(APIView):
 			if topup_status == 'ERROR_PERM':
 				transaction.error_description = error_description
 			transaction.payment_reference = data.get('paymentReference', '')
-			transaction.gateway_transaction_id = status_response.get('gatewayTransactionId', '')
+			transaction.gateway_transaction_id = data.get('gatewayTransactionId', '')
 			transaction.save()
 			
 			if topup_status == 'SUCCESSFUL':

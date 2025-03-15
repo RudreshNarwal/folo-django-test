@@ -154,6 +154,8 @@ class TopUpTransaction(models.Model):
 	description = models.TextField(blank=True, null=True, help_text="Description of the transaction.")
 	merchant_name = models.CharField(max_length=255, help_text="Name of the merchant.")
 	payment_type = models.CharField(max_length=50, help_text="Payment type, e.g., EFT.")
+	gateway_transaction_id = models.CharField(null=True, blank=True, max_length=50)
+	gateway = models.CharField(null=True, blank=True, max_length=50)
 	created_at = models.DateTimeField(help_text="Timestamp when the transaction was created.")
 	extra_info = models.JSONField(blank=True, null=True, help_text="Additional info as a JSON object.")
 	payment_instrument_info = models.JSONField(help_text="Details about the payment instrument.")

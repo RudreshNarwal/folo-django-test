@@ -479,7 +479,7 @@ class TopUpMoneyAPIView(APIView):
 			"callbackUrl": callback_url,
 			"externalWalletId": phone,
 			"phone": phone,
-			"externalWalletType": "SFCM",
+			# "externalWalletType": "SFCM",
 			"description": description,
 			"type": "KE_DTB_STK_PUSH"
 		}
@@ -530,9 +530,10 @@ class TopUpWebhookAPIView(APIView):
 		try:
 			transaction = TopUpTransaction.objects.get(payment_id=payment_id)
 			transaction.status = topup_status
-			if status == 'ERROR_PERM':
+			if topup_status == 'ERROR_PERM':
 				transaction.error_description = error_description
 			transaction.payment_reference = data.get('paymentReference', '')
+			transaction.gateway_transaction_id = status_response.get('gatewayTransactionId', '')
 			transaction.save()
 			
 			if topup_status == 'SUCCESSFUL':
@@ -557,14 +558,53 @@ class TopUpStatusAPIView(APIView):
 	
 	def get(self, request, wallet_id, payment_id):
 		try:
+			# Get top-up status from DTB service
 			dtb_service = DTBService()
 			status_response = dtb_service.get_top_up_status(wallet_id, payment_id)
-			return Response(status_response)
+			
+			# Extract relevant data from the status response
+			topup_id = status_response.get('topupId')
+			topup_status = status_response.get('status')
+			
+			# Find the transaction using external_unique_id (which should match payment_id)
+			try:
+				transaction = TopUpTransaction.objects.get(payment_id=topup_id)
+				# Update transaction status
+				transaction.status = topup_status
+				
+				if topup_status == 'ERROR_PERM':
+					transaction.error_description = status_response.get('description', '')
+				
+				transaction.gateway = status_response.get('gateway', '')
+				transaction.gateway_transaction_id = status_response.get('gatewayTransactionId', '')
+				transaction.save()
+				
+				# If transaction is successful, update the wallet balance
+				if topup_status == 'SUCCESSFUL':
+					wallet = transaction.wallet
+					# Get updated wallet details
+					wallet_details = dtb_service.get_wallet_details(wallet.wallet_id)
+					wallet.available_balance = wallet_details['availableBalance']
+					wallet.current_balance = wallet_details['currentBalance']
+					wallet.save()
+					logger.info(f"Wallet {wallet.wallet_id} balance updated successfully.")
+				
+				# Return relevant information in the response
+				return Response(status_response)
+			
+			except TopUpTransaction.DoesNotExist:
+				logger.error(f"No transaction found for payment_id: {payment_id}")
+				return Response({
+					"status": "error",
+					"message": f"No transaction found for payment_id: {payment_id}"
+				}, status=status.HTTP_404_NOT_FOUND)
+		
 		except Exception as e:
+			logger.error(f"Error checking top-up status for wallet_id {wallet_id}, payment_id {payment_id}: {str(e)}")
 			return Response({
 				'status': 'error',
 				'message': str(e)
-			}, status=500)
+			}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class UserWalletAPIView(APIView):

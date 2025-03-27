@@ -479,7 +479,7 @@ class TopUpMoneyAPIView(APIView):
 			"callbackUrl": callback_url,
 			"externalWalletId": phone,
 			"phone": phone,
-			# "externalWalletType": "SFCM",
+			"externalWalletType": "SFCM",
 			"description": description,
 			"type": "KE_DTB_STK_PUSH"
 		}

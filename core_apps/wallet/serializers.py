@@ -40,11 +40,13 @@ class WalletResponseSerializer(serializers.ModelSerializer):
         ]
         
 class WalletSerializer(serializers.ModelSerializer):
+    customer = CustomerProfileSerializer()
+    
     class Meta:
         model = Wallet
         fields = [
             'wallet_id', 'name', 'description', 'status', 'currency',
-            'available_balance', 'current_balance'
+            'available_balance', 'current_balance', 'reservations', 'account_number', 'customer'
         ]
 
 class TopUpTransactionSerializer(serializers.ModelSerializer):

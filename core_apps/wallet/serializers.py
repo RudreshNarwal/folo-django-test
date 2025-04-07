@@ -55,3 +55,11 @@ class TopUpTransactionSerializer(serializers.ModelSerializer):
         fields = [
             'payment_id', 'status', 'amount', 'currency', 'created_at', 'description',
         ]
+
+class WalletDetailsSerializer(serializers.ModelSerializer):
+    first_name = serializers.CharField(source='user.first_name')
+    last_name = serializers.CharField(source='user.last_name')
+    
+    class Meta:
+        model = Wallet
+        fields = ['first_name', 'last_name', 'account_number', 'wallet_id', 'status']

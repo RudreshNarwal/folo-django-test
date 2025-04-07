@@ -1,5 +1,6 @@
 # views.py
 from django.core.mail import send_mail
+from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -12,7 +13,7 @@ from django.conf import settings
 
 from core_apps.users.models.user import User, Document, Address
 from .models import CardType, CustomerProfile, ProviderDocument, TopUpTransaction, Wallet, WalletType
-from .serializers import TopUpTransactionSerializer, WalletResponseSerializer, WalletSerializer
+from .serializers import TopUpTransactionSerializer, WalletDetailsSerializer, WalletResponseSerializer, WalletSerializer
 from .services.dtb_services import (
 	DTBService,
 	DTBServiceError,
@@ -633,3 +634,22 @@ class WalletTransactionHistoryAPIView(generics.ListAPIView):
 	def get_queryset(self):
 		wallet = Wallet.objects.get(user=self.request.user, status='ACTIVE')
 		return TopUpTransaction.objects.filter(wallet=wallet).order_by('-created_at')
+
+
+class WalletDetailsAPIView(APIView):
+	permission_classes = [IsAuthenticated]
+	
+	def get(self, request):
+		wallet_id = request.query_params.get('wallet_id')
+		
+		if not wallet_id:
+			return Response(
+				{"error": "Wallet ID is required as a query parameter"},
+				status=status.HTTP_400_BAD_REQUEST
+			)
+		
+		wallet = get_object_or_404(Wallet, wallet_id=wallet_id)
+		
+		serializer = WalletDetailsSerializer(wallet)
+		return Response(serializer.data, status=status.HTTP_200_OK)
+

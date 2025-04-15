@@ -87,6 +87,11 @@ class Wallet(GenericModel):
 	external_unique_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
 	wallet_id = models.PositiveIntegerField(unique=True,
 	                                        help_text="A unique system-generated numeric identifier for the wallet. Possible values: >= 1.")
+	mpin = models.CharField(max_length=6, validators=[
+		MinLengthValidator(4), 
+		MaxLengthValidator(6),
+		RegexValidator(regex=r'^\d+$', message="MPIN must contain only digits.")
+	], null=True, blank=True, help_text="4-6 digit PIN for securing wallet transactions")
 	wallet_type = models.ForeignKey(WalletType, on_delete=models.PROTECT, related_name='wallets')
 	name = models.CharField(max_length=50, validators=[MinLengthValidator(3), MaxLengthValidator(50)],
 	                        help_text="Name of the Wallet. Possible values: >= 3 characters and <= 50 characters.")
@@ -195,4 +200,53 @@ class TopUpTransaction(models.Model):
 	class Meta:
 		verbose_name = "TopUp Transaction"
 		verbose_name_plural = "TopUp Transactions"
+		ordering = ['-created_at']
+
+
+class Transaction(models.Model):
+	TRANSACTION_TYPES = [
+		('WALLET_TO_WALLET', 'Wallet to Wallet Transfer'),
+		('WALLET_TO_MPESA', 'Wallet to MPESA Transfer')
+	]
+	
+	STATUS_CHOICES = [
+		('PENDING', 'Pending'),
+		('SUCCESSFUL', 'Successful'),
+		('FAILED', 'Failed'),
+	]
+	
+	transaction_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+	external_unique_id = models.UUIDField(unique=True, help_text="Unique ID generated for the transaction.")
+	external_reference_id = models.CharField(max_length=100, null=True, blank=True, help_text="External reference ID from provider")
+	transaction_type = models.CharField(max_length=50, choices=TRANSACTION_TYPES)
+	amount = models.DecimalField(
+		max_digits=20, 
+		decimal_places=2,
+		validators=[MinValueValidator(1)],
+		help_text="Transaction amount."
+	)
+	fee = models.DecimalField(max_digits=20, decimal_places=2, default=0.00, help_text="Transaction fee.")
+	from_wallet = models.ForeignKey(Wallet, on_delete=models.PROTECT, related_name='sent_transactions')
+	to_wallet = models.ForeignKey(Wallet, on_delete=models.PROTECT, related_name='received_transactions', null=True, blank=True)
+	currency = models.CharField(max_length=3, default='KES')
+	status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+	user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='transactions')
+	customer = models.ForeignKey(CustomerProfile, on_delete=models.CASCADE, related_name='transactions')
+	description = models.TextField(blank=True, null=True)
+	gateway = models.CharField(max_length=50, null=True, blank=True)
+	gateway_transaction_id = models.CharField(max_length=50, null=True, blank=True)
+	deliver_to_phone = models.CharField(max_length=15, null=True, blank=True)
+	reference = models.CharField(max_length=100, null=True, blank=True)
+	created_at = models.DateTimeField(auto_now_add=True)
+	updated_at = models.DateTimeField(auto_now=True)
+	extra_info = models.JSONField(null=True, blank=True)
+	webhook_response = models.JSONField(null=True, blank=True, help_text="Webhook response data for the transaction")
+	withdrawal_id = models.PositiveIntegerField(null=True, blank=True, help_text="ID for MPESA withdrawals")
+	
+	def __str__(self):
+		return f"Transaction {self.transaction_id} - {self.get_transaction_type_display()} - {self.status}"
+	
+	class Meta:
+		verbose_name = "Transaction"
+		verbose_name_plural = "Transactions"
 		ordering = ['-created_at']

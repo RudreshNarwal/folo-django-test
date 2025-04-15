@@ -178,7 +178,39 @@ class DTBService:
         url = f'{self.BASE_URL}/tenants/{self.TENANT_ID}/wallets/{wallet_id}'
         response = self.request_with_retries('GET', url, headers=self.headers)
         return response.json()
-    
+        
+    def wallet_to_wallet_transfer(self, payload):
+        """
+        Transfer funds from one wallet to another wallet
+        
+        Payload should include:
+        - amount: Amount to transfer
+        - description: Description of the transfer
+        - externalId: External ID for the transaction (optional)
+        - externalUniqueId: Unique ID for the transaction
+        - fromWalletId: Source wallet ID
+        - toWalletId: Destination wallet ID
+        """
+        url = f'{self.BASE_URL}/tenants/{self.TENANT_ID}/wallets/transfers'
+        response = self.request_with_retries('POST', url, json=payload, headers=self.headers)
+        return response.status_code
+        
+    def wallet_to_mpesa_transfer(self, wallet_id, payload):
+        """
+        Transfer funds from wallet to MPESA
+        
+        Payload should include:
+        - deliverToPhone: Phone number to send money to
+        - reference: Reference for the transaction
+        - amount: Amount to transfer
+        - callbackUrl: URL for callback notifications
+        - description: Description of the transaction
+        - type: Type of transfer (e.g., KE_DTB_MPESA)
+        - externalUniqueId: Unique ID for the transaction
+        """
+        url = f'{self.BASE_URL}/tenants/{self.TENANT_ID}/wallets/{wallet_id}/withdrawals'
+        response = self.request_with_retries('POST', url, json=payload, headers=self.headers)
+        return response.json()
     
 
 

@@ -11,7 +11,9 @@ from ..models import Transaction, Wallet, CustomerProfile
 from ..serializers import (
     TransactionSerializer, 
     WalletToWalletTransferSerializer,
-    WalletToMpesaTransferSerializer
+    WalletToMpesaTransferSerializer,
+    WithdrawalFeeRequestSerializer,
+    WithdrawalFeeResponseSerializer
 )
 from ..services.dtb_services import (
     DTBService,
@@ -29,29 +31,19 @@ class WalletToWalletTransferAPIView(APIView):
     
     @db_transaction.atomic
     def post(self, request):
-        serializer = WalletToWalletTransferSerializer(data=request.data)
+        # Pass request context to the serializer for user authentication
+        serializer = WalletToWalletTransferSerializer(data=request.data, context={'request': request})
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
         # Get validated data
-        from_wallet_id = serializer.validated_data['from_wallet_id']
         to_wallet_id = serializer.validated_data['to_wallet_id']
         amount = serializer.validated_data['amount']
         description = serializer.validated_data.get('description', 'Wallet to wallet transfer')
         
-        # Get source wallet and validate ownership
-        try:
-            from_wallet = Wallet.objects.get(wallet_id=from_wallet_id)
-            if from_wallet.user != request.user:
-                return Response(
-                    {"error": "You do not have permission to transfer from this wallet"},
-                    status=status.HTTP_403_FORBIDDEN
-                )
-        except Wallet.DoesNotExist:
-            return Response(
-                {"error": "Source wallet not found"}, 
-                status=status.HTTP_404_NOT_FOUND
-            )
+        # Get source wallet from serializer
+        from_wallet = serializer.wallet
+        from_wallet_id = from_wallet.wallet_id
             
         # Get destination wallet
         try:
@@ -153,30 +145,20 @@ class WalletToMpesaTransferAPIView(APIView):
     
     @db_transaction.atomic
     def post(self, request):
-        serializer = WalletToMpesaTransferSerializer(data=request.data)
+        # Pass request context to the serializer for user authentication
+        serializer = WalletToMpesaTransferSerializer(data=request.data, context={'request': request})
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
         # Get validated data
-        wallet_id = serializer.validated_data['wallet_id']
         amount = serializer.validated_data['amount']
         deliver_to_phone = serializer.validated_data['deliver_to_phone']
         reference = serializer.validated_data.get('reference', f"REF-{uuid.uuid4().hex[:8]}")
         description = serializer.validated_data.get('description', 'Wallet to MPESA transfer')
         
-        # Get wallet and validate ownership
-        try:
-            wallet = Wallet.objects.get(wallet_id=wallet_id)
-            if wallet.user != request.user:
-                return Response(
-                    {"error": "You do not have permission to transfer from this wallet"},
-                    status=status.HTTP_403_FORBIDDEN
-                )
-        except Wallet.DoesNotExist:
-            return Response(
-                {"error": "Wallet not found"}, 
-                status=status.HTTP_404_NOT_FOUND
-            )
+        # Get wallet from serializer (already validated in serializer)
+        wallet = serializer.wallet
+        wallet_id = wallet.wallet_id
         
         # Generate unique ID for the transaction
         external_unique_id = uuid.uuid4()
@@ -340,3 +322,42 @@ class TransactionHistoryAPIView(generics.ListAPIView):
     def get_queryset(self):
         user = self.request.user
         return Transaction.objects.filter(user=user).order_by('-created_at')
+
+
+class GetWithdrawalFeeAPIView(APIView):
+    """API for getting the fee for a wallet withdrawal."""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        serializer = WithdrawalFeeRequestSerializer(data=request.query_params)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get the user's active wallet (same security pattern as other endpoints)
+        try:
+            wallet = Wallet.objects.get(user=request.user, status='ACTIVE')
+        except Wallet.DoesNotExist:
+            return Response(
+                {"error": "No active wallet found for your account"}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Wallet.MultipleObjectsReturned:
+            wallet = Wallet.objects.filter(user=request.user, status='ACTIVE').first()
+        
+        # Get fee from DTB service
+        amount = serializer.validated_data['amount']
+        withdrawal_type = serializer.validated_data.get('withdrawal_type', 'KE_DTB_MPESA')
+        
+        try:
+            dtb_service = DTBService()
+            fee_response = dtb_service.get_withdrawal_fee(wallet.wallet_id, amount, withdrawal_type)
+            
+            # Use our response serializer to return a cleaner format
+            response_serializer = WithdrawalFeeResponseSerializer(fee_response)
+            return Response(response_serializer.data, status=status.HTTP_200_OK)
+        except (DTBServiceAuthenticationError, DTBServiceAPIError) as e:
+            logger.error(f"DTB API Error getting withdrawal fee: {e}")
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.error(f"Unexpected error getting withdrawal fee: {e}")
+            return Response({"error": "An unexpected error occurred"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

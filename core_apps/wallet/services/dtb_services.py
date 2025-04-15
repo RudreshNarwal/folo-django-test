@@ -211,6 +211,25 @@ class DTBService:
         url = f'{self.BASE_URL}/tenants/{self.TENANT_ID}/wallets/{wallet_id}/withdrawals'
         response = self.request_with_retries('POST', url, json=payload, headers=self.headers)
         return response.json()
+        
+    def get_withdrawal_fee(self, wallet_id, amount, withdrawal_type="KE_DTB_MPESA"):
+        """
+        Get the fee for a specific withdrawal amount and type
+        
+        Parameters:
+        - wallet_id: ID of the wallet
+        - amount: Amount to withdraw
+        - withdrawal_type: Type of withdrawal (default: KE_DTB_MPESA)
+        
+        Returns a dict with 'feeAmount' key
+        """
+        url = f'{self.BASE_URL}/tenants/{self.TENANT_ID}/wallets/{wallet_id}/withdrawals/fees'
+        params = {
+            'amount': amount,
+            'type': withdrawal_type
+        }
+        response = self.request_with_retries('GET', url, headers=self.headers, params=params)
+        return response.json()
     
 
 

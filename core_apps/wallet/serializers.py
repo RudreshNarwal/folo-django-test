@@ -98,7 +98,6 @@ class TransactionSerializer(serializers.ModelSerializer):
 class WalletToWalletTransferSerializer(serializers.Serializer):
 	amount = serializers.DecimalField(max_digits=20, decimal_places=2, min_value=1)
 	description = serializers.CharField(required=False, allow_blank=True)
-	from_wallet_id = serializers.IntegerField()
 	to_wallet_id = serializers.IntegerField()
 	mpin = serializers.CharField(write_only=True, min_length=4, max_length=6)
 	
@@ -107,48 +106,42 @@ class WalletToWalletTransferSerializer(serializers.Serializer):
 			raise serializers.ValidationError("Amount must be greater than 0")
 		return value
 	
-	def validate_from_wallet_id(self, value):
-		try:
-			wallet = Wallet.objects.get(wallet_id=value)
-			if wallet.status != 'ACTIVE':
-				raise serializers.ValidationError("Source wallet is not active")
-		except Wallet.DoesNotExist:
-			raise serializers.ValidationError("Source wallet not found")
-		return value
-	
 	def validate(self, data):
-		# Validate MPIN for from_wallet
-		try:
-			wallet = Wallet.objects.get(wallet_id=data['from_wallet_id'])
-			if wallet.mpin != data['mpin']:
-				raise serializers.ValidationError({"mpin": "Invalid MPIN"})
-			
-			# Check if wallet has sufficient balance
-			if wallet.available_balance < data['amount']:
-				raise serializers.ValidationError({"amount": "Insufficient balance in wallet"})
+		# Get the user context from the serializer context
+		request = self.context.get('request')
+		if not request or not request.user.is_authenticated:
+			raise serializers.ValidationError({"error": "Authentication required"})
 		
+		user = request.user
+		
+		# Get the user's active wallet
+		try:
+			wallet = Wallet.objects.get(user=user, status='ACTIVE')
 		except Wallet.DoesNotExist:
-			raise serializers.ValidationError({"from_wallet_id": "Source wallet not found"})
+			raise serializers.ValidationError({"error": "No active wallet found for your account"})
+		except Wallet.MultipleObjectsReturned:
+			wallet = Wallet.objects.filter(user=user, status='ACTIVE').first()
+		
+		# Set the from_wallet_id for other validations
+		self.wallet = wallet
+		
+		# Validate MPIN
+		if wallet.mpin != data['mpin']:
+			raise serializers.ValidationError({"mpin": "Invalid MPIN"})
+		
+		# Check if wallet has sufficient balance
+		if wallet.available_balance < data['amount']:
+			raise serializers.ValidationError({"amount": "Insufficient balance in wallet"})
 		
 		return data
 
 
 class WalletToMpesaTransferSerializer(serializers.Serializer):
-	wallet_id = serializers.IntegerField()
 	amount = serializers.DecimalField(max_digits=20, decimal_places=2, min_value=1)
 	deliver_to_phone = serializers.CharField()
 	reference = serializers.CharField(required=False)
 	description = serializers.CharField(required=False, allow_blank=True)
 	mpin = serializers.CharField(write_only=True, min_length=4, max_length=6)
-	
-	def validate_wallet_id(self, value):
-		try:
-			wallet = Wallet.objects.get(wallet_id=value)
-			if wallet.status != 'ACTIVE':
-				raise serializers.ValidationError("Wallet is not active")
-		except Wallet.DoesNotExist:
-			raise serializers.ValidationError("Wallet not found")
-		return value
 	
 	def validate_deliver_to_phone(self, value):
 		# Simple validation for phone number format
@@ -157,18 +150,31 @@ class WalletToMpesaTransferSerializer(serializers.Serializer):
 		return value
 	
 	def validate(self, data):
-		# Validate MPIN
-		try:
-			wallet = Wallet.objects.get(wallet_id=data['wallet_id'])
-			if wallet.mpin != data['mpin']:
-				raise serializers.ValidationError({"mpin": "Invalid MPIN"})
-			
-			# Check if wallet has sufficient balance
-			if wallet.available_balance < data['amount']:
-				raise serializers.ValidationError({"amount": "Insufficient balance in wallet"})
+		# Get the user context from the serializer context
+		request = self.context.get('request')
+		if not request or not request.user.is_authenticated:
+			raise serializers.ValidationError({"error": "Authentication required"})
 		
+		user = request.user
+		
+		# Get the user's active wallet
+		try:
+			wallet = Wallet.objects.get(user=user, status='ACTIVE')
 		except Wallet.DoesNotExist:
-			raise serializers.ValidationError({"wallet_id": "Wallet not found"})
+			raise serializers.ValidationError({"error": "No active wallet found for your account"})
+		except Wallet.MultipleObjectsReturned:
+			wallet = Wallet.objects.filter(user=user, status='ACTIVE').first()
+		
+		# Store the wallet for later use
+		self.wallet = wallet
+		
+		# Validate MPIN
+		if wallet.mpin != data['mpin']:
+			raise serializers.ValidationError({"mpin": "Invalid MPIN"})
+		
+		# Check if wallet has sufficient balance
+		if wallet.available_balance < data['amount']:
+			raise serializers.ValidationError({"amount": "Insufficient balance in wallet"})
 		
 		return data
 
@@ -205,3 +211,17 @@ class UpdateMpinSerializer(serializers.Serializer):
 			raise serializers.ValidationError({"wallet_id": "Wallet not found"})
 			
 		return data
+
+
+class WithdrawalFeeRequestSerializer(serializers.Serializer):
+	amount = serializers.DecimalField(max_digits=20, decimal_places=2, min_value=1)
+	withdrawal_type = serializers.CharField(default="KE_DTB_MPESA", required=False)
+	
+	def validate_amount(self, value):
+		if value <= 0:
+			raise serializers.ValidationError("Amount must be greater than 0")
+		return value
+
+
+class WithdrawalFeeResponseSerializer(serializers.Serializer):
+	fee_amount = serializers.DecimalField(max_digits=20, decimal_places=2, source="feeAmount")

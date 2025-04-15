@@ -9,7 +9,8 @@ from .views.transaction import (
     WalletToWalletTransferAPIView, 
     WalletToMpesaTransferAPIView, 
     MpesaWithdrawalWebhookAPIView,
-    TransactionHistoryAPIView
+    TransactionHistoryAPIView,
+    GetWithdrawalFeeAPIView
 )
 # Import from views/mpin.py
 from .views.mpin import UpdateWalletMpinAPIView
@@ -29,6 +30,7 @@ urlpatterns = [
     path('transfers/wallet-to-mpesa/', WalletToMpesaTransferAPIView.as_view(), name='wallet-to-mpesa-transfer'),
     path('transfers/mpesa-webhook/', MpesaWithdrawalWebhookAPIView.as_view(), name='mpesa-withdrawal-webhook'),
     path('transfers/history/', TransactionHistoryAPIView.as_view(), name='transaction-history'),
+    path('transfers/withdrawal-fee/', GetWithdrawalFeeAPIView.as_view(), name='withdrawal-fee'),
     
     # MPIN management endpoint
     path('mpin/update/', UpdateWalletMpinAPIView.as_view(), name='update-wallet-mpin'),

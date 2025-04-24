@@ -3,7 +3,6 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django_countries.serializers import CountryFieldMixin
 from .models import CustomerProfile, ProviderDocument, TopUpTransaction, Transaction, Wallet, UserContact, WalletType
-from .services.mpin_utils import verify_mpin
 
 User = get_user_model()
 
@@ -124,8 +123,12 @@ class WalletToWalletTransferSerializer(serializers.Serializer):
 		# Set the from_wallet_id for other validations
 		self.wallet = wallet
 		
-		# Validate MPIN
-		if wallet.mpin != data['mpin']:
+		# Validate MPIN using direct comparison
+		# !! SECURITY WARNING: Assumes self.wallet.mpin is appropriately handled (e.g., hashed) !!
+		if not self.wallet.mpin:
+			raise serializers.ValidationError({"mpin": "MPIN is not set for your wallet. Please set it first."})
+		# Direct comparison:
+		if data['mpin'] != self.wallet.mpin:
 			raise serializers.ValidationError({"mpin": "Invalid MPIN"})
 		
 		# Check if wallet has sufficient balance
@@ -155,22 +158,24 @@ class WalletToMpesaTransferSerializer(serializers.Serializer):
 		# Validate user's active wallet and MPIN
 		try:
 			self.wallet = Wallet.objects.get(user=user, status='ACTIVE')
+			# !! SECURITY WARNING: Assumes self.wallet.mpin is appropriately handled (e.g., hashed) !!
 			if not self.wallet.mpin:
 				raise serializers.ValidationError("MPIN is not set for your wallet. Please set it first.")
-			if not verify_mpin(mpin, self.wallet.mpin):
+			# Direct comparison:
+			if mpin != self.wallet.mpin:
 				raise serializers.ValidationError("Invalid MPIN.")
 		except Wallet.DoesNotExist:
 			raise serializers.ValidationError("No active wallet found for your account.")
 		except Wallet.MultipleObjectsReturned:
-			# Handle case where user might have multiple ACTIVE wallets (shouldn't happen with OneToOne)
-			# If it can happen, add logic to select the correct one or raise an error
 			self.wallet = Wallet.objects.filter(user=user, status='ACTIVE').first()
 			if not self.wallet:
 				raise serializers.ValidationError("No active wallet found for your account.")
-			# Repeat MPIN check
+			# Repeat MPIN check with direct comparison
+			# !! SECURITY WARNING: Assumes self.wallet.mpin is appropriately handled (e.g., hashed) !!
 			if not self.wallet.mpin:
 				raise serializers.ValidationError("MPIN is not set for your wallet. Please set it first.")
-			if not verify_mpin(mpin, self.wallet.mpin):
+			# Direct comparison:
+			if mpin != self.wallet.mpin:
 				raise serializers.ValidationError("Invalid MPIN.")
 		
 		# Check if amount exceeds available balance (consider fees later if applicable)

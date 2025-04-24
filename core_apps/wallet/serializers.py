@@ -2,7 +2,8 @@ from django.core.validators import RegexValidator
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django_countries.serializers import CountryFieldMixin
-from .models import CustomerProfile, ProviderDocument, TopUpTransaction, Transaction, Wallet
+from .models import CustomerProfile, ProviderDocument, TopUpTransaction, Transaction, Wallet, UserContact, WalletType
+from .services.mpin_utils import verify_mpin
 
 User = get_user_model()
 
@@ -77,22 +78,20 @@ class WalletDetailsSerializer(serializers.ModelSerializer):
 
 
 class TransactionSerializer(serializers.ModelSerializer):
-	from_wallet_number = serializers.CharField(source='from_wallet.account_number', read_only=True)
-	to_wallet_number = serializers.CharField(source='to_wallet.account_number', read_only=True, allow_null=True)
+	from_wallet_id = serializers.CharField(source='from_wallet.wallet_id', read_only=True, allow_null=True)
+	to_wallet_id = serializers.CharField(source='to_wallet.wallet_id', read_only=True, allow_null=True)
+	contact_name = serializers.CharField(source='contact.name', read_only=True, allow_null=True)
+	contact_phone = serializers.CharField(source='contact.phone_number', read_only=True, allow_null=True)
 	
 	class Meta:
 		model = Transaction
 		fields = [
-			'transaction_id', 'transaction_type', 'amount', 'fee',
-			'from_wallet_number', 'to_wallet_number', 'to_wallet_id',
-			'currency', 'status', 'description', 'gateway',
-			'gateway_transaction_id', 'deliver_to_phone',
-			'reference', 'created_at', 'updated_at',
+			'transaction_id', 'transaction_type', 'amount', 'fee', 'currency',
+			'status', 'description', 'created_at', 'from_wallet_id',
+			'to_wallet_id', 'deliver_to_phone', 'gateway_transaction_id',
+			'contact_name', 'contact_phone'
 		]
-		read_only_fields = [
-			'transaction_id', 'fee', 'status', 'gateway',
-			'gateway_transaction_id', 'created_at', 'updated_at',
-		]
+		read_only_fields = fields
 
 
 class WalletToWalletTransferSerializer(serializers.Serializer):
@@ -137,57 +136,67 @@ class WalletToWalletTransferSerializer(serializers.Serializer):
 
 
 class WalletToMpesaTransferSerializer(serializers.Serializer):
-	amount = serializers.DecimalField(max_digits=20, decimal_places=2, min_value=1)
-	deliver_to_phone = serializers.CharField()
-	reference = serializers.CharField(required=False)
-	description = serializers.CharField(required=False, allow_blank=True)
-	mpin = serializers.CharField(write_only=True, min_length=4, max_length=6)
-	
-	def validate_deliver_to_phone(self, value):
-		# Simple validation for phone number format
-		if not value.isdigit() or not value.startswith('254'):
-			raise serializers.ValidationError("Phone number should be in format 254XXXXXXXXX")
-		return value
+	amount = serializers.DecimalField(
+		max_digits=20, decimal_places=2, min_value=10, max_value=150000
+	)
+	phone_number = serializers.CharField(max_length=20)
+	contact_name = serializers.CharField(max_length=100, required=False, allow_blank=True)
+	mpin = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
+	description = serializers.CharField(max_length=200, required=False, allow_blank=True)
 	
 	def validate(self, data):
-		# Get the user context from the serializer context
 		request = self.context.get('request')
-		if not request or not request.user.is_authenticated:
-			raise serializers.ValidationError({"error": "Authentication required"})
+		if not request or not request.user:
+			raise serializers.ValidationError("User context is required.")
 		
 		user = request.user
+		mpin = data.get('mpin')
 		
-		# Get the user's active wallet
+		# Validate user's active wallet and MPIN
 		try:
-			wallet = Wallet.objects.get(user=user, status='ACTIVE')
+			self.wallet = Wallet.objects.get(user=user, status='ACTIVE')
+			if not self.wallet.mpin:
+				raise serializers.ValidationError("MPIN is not set for your wallet. Please set it first.")
+			if not verify_mpin(mpin, self.wallet.mpin):
+				raise serializers.ValidationError("Invalid MPIN.")
 		except Wallet.DoesNotExist:
-			raise serializers.ValidationError({"error": "No active wallet found for your account"})
+			raise serializers.ValidationError("No active wallet found for your account.")
 		except Wallet.MultipleObjectsReturned:
-			wallet = Wallet.objects.filter(user=user, status='ACTIVE').first()
+			# Handle case where user might have multiple ACTIVE wallets (shouldn't happen with OneToOne)
+			# If it can happen, add logic to select the correct one or raise an error
+			self.wallet = Wallet.objects.filter(user=user, status='ACTIVE').first()
+			if not self.wallet:
+				raise serializers.ValidationError("No active wallet found for your account.")
+			# Repeat MPIN check
+			if not self.wallet.mpin:
+				raise serializers.ValidationError("MPIN is not set for your wallet. Please set it first.")
+			if not verify_mpin(mpin, self.wallet.mpin):
+				raise serializers.ValidationError("Invalid MPIN.")
 		
-		# Store the wallet for later use
-		self.wallet = wallet
+		# Check if amount exceeds available balance (consider fees later if applicable)
+		if data['amount'] > self.wallet.available_balance:
+			raise serializers.ValidationError(f"Insufficient balance. Available: {self.wallet.available_balance}")
 		
-		# Validate MPIN
-		if wallet.mpin != data['mpin']:
-			raise serializers.ValidationError({"mpin": "Invalid MPIN"})
-		
-		# Check if wallet has sufficient balance
-		if wallet.available_balance < data['amount']:
-			raise serializers.ValidationError({"amount": "Insufficient balance in wallet"})
+		# Basic phone number validation (you might want more specific validation)
+		phone_number = data.get('phone_number')
+		if not phone_number or not phone_number.isdigit():
+			raise serializers.ValidationError("Invalid phone number format.")
+		# Prevent sending to self
+		if phone_number == user.mobile:  # Assuming user model has a 'mobile' field
+			raise serializers.ValidationError("Cannot send funds to your own phone number.")
 		
 		return data
 
 
 class UpdateMpinSerializer(serializers.Serializer):
 	wallet_id = serializers.IntegerField()
-	current_mpin = serializers.CharField(required=False, allow_blank=True, 
-										min_length=4, max_length=4, 
-										validators=[RegexValidator(regex=r'^\d{4}$', 
-													  message="MPIN must be exactly 4 digits.")])
-	new_mpin = serializers.CharField(min_length=4, max_length=4, 
-									validators=[RegexValidator(regex=r'^\d{4}$', 
-												  message="MPIN must be exactly 4 digits.")])
+	current_mpin = serializers.CharField(required=False, allow_blank=True,
+	                                     min_length=4, max_length=4,
+	                                     validators=[RegexValidator(regex=r'^\d{4}$',
+	                                                                message="MPIN must be exactly 4 digits.")])
+	new_mpin = serializers.CharField(min_length=4, max_length=4,
+	                                 validators=[RegexValidator(regex=r'^\d{4}$',
+	                                                            message="MPIN must be exactly 4 digits.")])
 	confirm_mpin = serializers.CharField(min_length=4, max_length=4)
 	
 	def validate(self, data):
@@ -209,7 +218,7 @@ class UpdateMpinSerializer(serializers.Serializer):
 					raise serializers.ValidationError({"current_mpin": "Current MPIN is incorrect"})
 		except Wallet.DoesNotExist:
 			raise serializers.ValidationError({"wallet_id": "Wallet not found"})
-			
+		
 		return data
 
 
@@ -225,3 +234,25 @@ class WithdrawalFeeRequestSerializer(serializers.Serializer):
 
 class WithdrawalFeeResponseSerializer(serializers.Serializer):
 	fee_amount = serializers.DecimalField(max_digits=20, decimal_places=2, source="feeAmount")
+
+
+class CheckContactWalletRequestSerializer(serializers.Serializer):
+	phone_number = serializers.CharField(max_length=20, required=True)
+	name = serializers.CharField(max_length=100, required=False, allow_blank=True, allow_null=True)
+	
+	def validate_phone_number(self, value):
+		# Add more specific validation if needed (e.g., regex for Kenyan numbers)
+		if not value or not value.isdigit():
+			raise serializers.ValidationError("Invalid phone number format.")
+		# You might want to prevent checking the user's own number
+		request = self.context.get('request')
+		if request and request.user and value == request.user.mobile:
+			raise serializers.ValidationError("Cannot check your own phone number.")
+		return value
+
+
+class UserContactSerializer(serializers.ModelSerializer):
+	class Meta:
+		model = UserContact
+		fields = ['id', 'name', 'phone_number', 'last_used']
+		read_only_fields = ['id', 'last_used']

@@ -12,6 +12,7 @@ from django_countries.fields import CountryField
 from generics.utils.models import GenericModel
 from core_apps.users.models.user import Document
 from django.core.exceptions import ValidationError
+from core_apps.users.models import User
 
 User = get_user_model()
 
@@ -83,7 +84,7 @@ class CardType(models.TextChoices):
 
 
 class Wallet(GenericModel):
-	user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='wallets')
+	user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='wallet_profile')
 	external_unique_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
 	wallet_id = models.PositiveIntegerField(unique=True,
 	                                        help_text="A unique system-generated numeric identifier for the wallet. Possible values: >= 1.")
@@ -203,6 +204,23 @@ class TopUpTransaction(models.Model):
 		ordering = ['-created_at']
 
 
+class UserContact(models.Model):
+	"""Stores contacts associated with a user for quick transfers."""
+	user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='contacts')
+	name = models.CharField(max_length=100, blank=True, null=True) # Name is optional
+	phone_number = models.CharField(max_length=20) # Consider adding validation
+	last_used = models.DateTimeField(default=timezone.now)
+	created_at = models.DateTimeField(auto_now_add=True)
+	updated_at = models.DateTimeField(auto_now=True)
+
+	class Meta:
+		unique_together = ('user', 'phone_number') # A user can only have one contact per phone number
+		ordering = ['-last_used', 'name']
+
+	def __str__(self):
+		return f"{self.user.get_username()}'s contact: {self.name or self.phone_number}"
+
+
 class Transaction(models.Model):
 	TRANSACTION_TYPES = [
 		('WALLET_TO_WALLET', 'Wallet to Wallet Transfer'),
@@ -226,25 +244,26 @@ class Transaction(models.Model):
 		help_text="Transaction amount."
 	)
 	fee = models.DecimalField(max_digits=20, decimal_places=2, default=0.00, help_text="Transaction fee.")
-	from_wallet = models.ForeignKey(Wallet, on_delete=models.PROTECT, related_name='sent_transactions')
-	to_wallet = models.ForeignKey(Wallet, on_delete=models.PROTECT, related_name='received_transactions', null=True, blank=True)
+	from_wallet = models.ForeignKey(Wallet, on_delete=models.PROTECT, null=True, related_name='outgoing_transactions')
+	to_wallet = models.ForeignKey(Wallet, on_delete=models.PROTECT, null=True, blank=True, related_name='incoming_transactions')
 	currency = models.CharField(max_length=3, default='KES')
 	status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
-	user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='transactions')
-	customer = models.ForeignKey(CustomerProfile, on_delete=models.CASCADE, related_name='transactions')
+	user = models.ForeignKey(User, on_delete=models.PROTECT, null=True, related_name='transactions')
+	customer = models.ForeignKey(CustomerProfile, on_delete=models.PROTECT, null=True, related_name='transactions')
 	description = models.TextField(blank=True, null=True)
 	gateway = models.CharField(max_length=50, null=True, blank=True)
 	gateway_transaction_id = models.CharField(max_length=50, null=True, blank=True)
-	deliver_to_phone = models.CharField(max_length=15, null=True, blank=True)
+	deliver_to_phone = models.CharField(max_length=20, blank=True, null=True) # Keep for direct MPESA, maybe rename?
 	reference = models.CharField(max_length=100, null=True, blank=True)
 	created_at = models.DateTimeField(auto_now_add=True)
 	updated_at = models.DateTimeField(auto_now=True)
 	extra_info = models.JSONField(null=True, blank=True)
 	webhook_response = models.JSONField(null=True, blank=True, help_text="Webhook response data for the transaction")
 	withdrawal_id = models.PositiveIntegerField(null=True, blank=True, help_text="ID for MPESA withdrawals")
+	contact = models.ForeignKey(UserContact, on_delete=models.PROTECT, null=True, blank=True, related_name='transactions')
 	
 	def __str__(self):
-		return f"Transaction {self.transaction_id} - {self.get_transaction_type_display()} - {self.status}"
+		return f"Transaction {self.transaction_id} ({self.transaction_type}) - {self.status}"
 	
 	class Meta:
 		verbose_name = "Transaction"

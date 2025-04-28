@@ -27,7 +27,7 @@ urlpatterns = [
     path('create-wallet/', CreateCustomerWalletAPIView.as_view(), name='create-wallet'),
     path('', UserWalletAPIView.as_view(), name='user-wallet'),
     # Renamed for clarity
-    path('transactions/all/', WalletTransactionHistoryAPIView.as_view(), name='wallet-transactions-all'),
+    path('top-up/transactions/', WalletTransactionHistoryAPIView.as_view(), name='wallet-transactions-all'),
     path('top-up/', TopUpMoneyAPIView.as_view(), name='top-up-money'),
     path('top-up/webhook/', TopUpWebhookAPIView.as_view(), name='top-up-webhook'),
     path('<str:wallet_id>/topups/<str:payment_id>/status/', TopUpStatusAPIView.as_view(), name='topup-status'),

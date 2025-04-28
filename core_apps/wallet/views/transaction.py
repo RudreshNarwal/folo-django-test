@@ -8,6 +8,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status, generics
 
+from .core import TransactionHistoryPagination
 from ..models import Transaction, Wallet, CustomerProfile, UserContact
 from core_apps.users.models import User
 from ..serializers import (
@@ -343,6 +344,7 @@ class TransactionHistoryAPIView(generics.ListAPIView):
     """API view for listing user's transaction history."""
     permission_classes = [IsAuthenticated]
     serializer_class = TransactionSerializer
+    pagination_class = TransactionHistoryPagination
     
     def get_queryset(self):
         user = self.request.user

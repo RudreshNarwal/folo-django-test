@@ -10,6 +10,8 @@ from django.db import transaction
 import logging
 import uuid
 from django.conf import settings
+from django.utils.dateparse import parse_datetime
+from django.utils import timezone
 
 from core_apps.users.models.user import User, Document, Address
 from ..models import CardType, CustomerProfile, ProviderDocument, TopUpTransaction, Wallet, WalletType
@@ -613,11 +615,101 @@ class UserWalletAPIView(APIView):
 	
 	def get(self, request):
 		try:
-			wallet = Wallet.objects.get(user=request.user, status='ACTIVE')
-			serializer = WalletSerializer(wallet)
-			return Response(serializer.data, status=status.HTTP_200_OK)
+			# 1. Fetch the local wallet instance
+			local_wallet = Wallet.objects.select_related('user', 'customer', 'wallet_type').get(user=request.user, status='ACTIVE')
 		except Wallet.DoesNotExist:
-			return Response({"error": "No active wallet found."}, status=status.HTTP_404_NOT_FOUND)
+			return Response({"error": "No active wallet found for this user."}, status=status.HTTP_404_NOT_FOUND)
+		except Wallet.MultipleObjectsReturned:
+			# If multiple active wallets could exist (though OneToOne on user should prevent this for 'wallet_profile')
+			# Prioritize or log an error. For now, let's take the first one.
+			local_wallet = Wallet.objects.select_related('user', 'customer', 'wallet_type').filter(user=request.user,
+			                                                                                       status='ACTIVE').first()
+			if not local_wallet:  # Should not happen if MultipleObjectsReturned was raised, but as a safeguard.
+				return Response({"error": "Error fetching active wallet for this user."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+		
+		try:
+			# 2. Fetch latest wallet details from DTB Service
+			dtb_service = DTBService()
+			# Assuming local_wallet.wallet_id is the correct identifier for DTB's system
+			dtb_wallet_data = dtb_service.get_wallet_details(local_wallet.wallet_id)
+			
+			# 3. Update local_wallet instance with data from DTB
+			# It's good practice to use .get() with defaults for potentially missing keys
+			local_wallet.name = dtb_wallet_data.get('name', local_wallet.name)
+			local_wallet.description = dtb_wallet_data.get('description', local_wallet.description)
+			local_wallet.current_balance = dtb_wallet_data.get('currentBalance', local_wallet.current_balance)
+			local_wallet.available_balance = dtb_wallet_data.get('availableBalance', local_wallet.available_balance)
+			local_wallet.reservations = dtb_wallet_data.get('reservations', local_wallet.reservations)
+			
+			new_status = dtb_wallet_data.get('status', local_wallet.status)
+			# Ensure the status from DTB is valid for your model's choices
+			if any(new_status in choice for choice in Wallet._meta.get_field('status').choices):
+				local_wallet.status = new_status
+			else:
+				# Log a warning if the status is not recognized, keep the old one
+				logger.warning(
+					f"Received unrecognized wallet status '{new_status}' from DTB for wallet ID {local_wallet.wallet_id}. Keeping old status '{local_wallet.status}'.")
+			
+			# Handle datetime string from DTB
+			created_str = dtb_wallet_data.get('created')
+			if created_str:
+				parsed_created = parse_datetime(created_str)
+				if parsed_created:
+					local_wallet.created = parsed_created
+				else:
+					logger.warning(f"Could not parse 'created' datetime '{created_str}' from DTB for wallet ID {local_wallet.wallet_id}.")
+			
+			# Handle wallet_type_id
+			dtb_wallet_type_id = dtb_wallet_data.get('walletTypeId')
+			if dtb_wallet_type_id:
+				try:
+					wallet_type_instance = WalletType.objects.get(wallet_type_id=dtb_wallet_type_id)
+					local_wallet.wallet_type = wallet_type_instance
+				except WalletType.DoesNotExist:
+					logger.error(f"WalletType with ID {dtb_wallet_type_id} not found in local DB for wallet {local_wallet.wallet_id}.")
+				# Decide how to handle: fail, or keep old, or create new WalletType?
+				# For now, we log an error and local_wallet.wallet_type remains unchanged.
+			
+			local_wallet.external_unique_id = dtb_wallet_data.get('externalUniqueId', local_wallet.external_unique_id)
+			local_wallet.currency = dtb_wallet_data.get('currency', local_wallet.currency)
+			local_wallet.friendly_id = dtb_wallet_data.get('friendlyId', local_wallet.friendly_id)
+			local_wallet.account_number = dtb_wallet_data.get('accountNumber', local_wallet.account_number)
+			local_wallet.configuration = dtb_wallet_data.get('configuration', local_wallet.configuration)
+			
+			# If DTB's customerId maps to your CustomerProfile.customer_id
+			dtb_customer_id = dtb_wallet_data.get('customerId')
+			if dtb_customer_id and local_wallet.customer:
+				if local_wallet.customer.customer_id != dtb_customer_id:
+					# This might indicate a mismatch or a need to update/relink CustomerProfile
+					logger.warning(
+						f"DTB customer ID {dtb_customer_id} differs from local {local_wallet.customer.customer_id} for wallet {local_wallet.wallet_id}")
+					# Potentially find and link to the correct CustomerProfile or update it:
+					# try:
+					#     correct_customer_profile = CustomerProfile.objects.get(customer_id=dtb_customer_id, user=request.user)
+					#     local_wallet.customer = correct_customer_profile
+					# except CustomerProfile.DoesNotExist:
+					#     logger.error(f"CustomerProfile with DTB customer ID {dtb_customer_id} not found for user.")
+			
+			local_wallet.save()  # Ensure this line has the correct number of spaces (likely 12 if inside the 'try' block)
+		
+		except (DTBServiceError, DTBServiceAPIError) as e:
+			logger.error(
+				f"DTB Service error when fetching wallet details for user {request.user.id}, wallet ID {local_wallet.wallet_id if local_wallet else 'N/A'}: {e}")
+			# Decide if you want to return the stale local data or an error
+			# For now, let's return an error indicating data might be stale or service is down
+			return Response(
+				{"error": "Could not retrieve latest wallet details from provider. Data may be outdated.", "details": str(e)},
+				status=status.HTTP_503_SERVICE_UNAVAILABLE
+			)
+		except Exception as e:
+			logger.error(f"Unexpected error when updating wallet for user {request.user.id}: {e}")
+			# Generic error
+			return Response({"error": "An unexpected error occurred while fetching wallet details."},
+			                status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+		
+		# 4. Serialize the updated (or local, if DTB failed and we chose to return local) wallet data
+		serializer = WalletSerializer(local_wallet)
+		return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class TransactionHistoryPagination(PageNumberPagination):
@@ -652,4 +744,3 @@ class WalletDetailsAPIView(APIView):
 		
 		serializer = WalletDetailsSerializer(wallet)
 		return Response(serializer.data, status=status.HTTP_200_OK)
-

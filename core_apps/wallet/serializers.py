@@ -195,13 +195,13 @@ class WalletToMpesaTransferSerializer(serializers.Serializer):
 
 class UpdateMpinSerializer(serializers.Serializer):
 	wallet_id = serializers.IntegerField()
-	current_mpin = serializers.CharField(required=False, allow_blank=True,
-	                                     min_length=4, max_length=4,
-	                                     validators=[RegexValidator(regex=r'^\d{4}$',
-	                                                                message="MPIN must be exactly 4 digits.")])
-	new_mpin = serializers.CharField(min_length=4, max_length=4,
-	                                 validators=[RegexValidator(regex=r'^\d{4}$',
-	                                                            message="MPIN must be exactly 4 digits.")])
+	current_mpin = serializers.CharField(required=False, allow_blank=True, 
+										min_length=4, max_length=4, 
+										validators=[RegexValidator(regex=r'^\d{4}$', 
+													  message="MPIN must be exactly 4 digits.")])
+	new_mpin = serializers.CharField(min_length=4, max_length=4, 
+									validators=[RegexValidator(regex=r'^\d{4}$', 
+												  message="MPIN must be exactly 4 digits.")])
 	confirm_mpin = serializers.CharField(min_length=4, max_length=4)
 	
 	def validate(self, data):
@@ -223,7 +223,7 @@ class UpdateMpinSerializer(serializers.Serializer):
 					raise serializers.ValidationError({"current_mpin": "Current MPIN is incorrect"})
 		except Wallet.DoesNotExist:
 			raise serializers.ValidationError({"wallet_id": "Wallet not found"})
-		
+			
 		return data
 
 

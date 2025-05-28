@@ -81,6 +81,8 @@ class TransactionSerializer(serializers.ModelSerializer):
 	to_wallet_id = serializers.CharField(source='to_wallet.wallet_id', read_only=True, allow_null=True)
 	contact_name = serializers.CharField(source='contact.name', read_only=True, allow_null=True)
 	contact_phone = serializers.CharField(source='contact.phone_number', read_only=True, allow_null=True)
+	transaction_direction = serializers.SerializerMethodField()
+	other_party_info = serializers.SerializerMethodField()
 	
 	class Meta:
 		model = Transaction
@@ -88,9 +90,88 @@ class TransactionSerializer(serializers.ModelSerializer):
 			'transaction_id', 'transaction_type', 'amount', 'fee', 'currency',
 			'status', 'description', 'created_at', 'from_wallet_id',
 			'to_wallet_id', 'deliver_to_phone', 'gateway_transaction_id',
-			'contact_name', 'contact_phone'
+			'contact_name', 'contact_phone', 'transaction_direction', 'other_party_info'
 		]
 		read_only_fields = fields
+	
+	def get_transaction_direction(self, obj):
+		"""Determine if this is an incoming or outgoing transaction for the current user."""
+		request = self.context.get('request')
+		if not request or not request.user:
+			return 'UNKNOWN'
+		
+		try:
+			user_wallet = Wallet.objects.get(user=request.user, status='ACTIVE')
+		except Wallet.DoesNotExist:
+			return 'UNKNOWN'
+		
+		# For wallet-to-wallet transfers
+		if obj.transaction_type == 'WALLET_TO_WALLET':
+			if obj.from_wallet == user_wallet:
+				return 'OUTGOING'
+			elif obj.to_wallet == user_wallet:
+				return 'INCOMING'
+		
+		# For MPESA and bank transfers (always outgoing from user's perspective)
+		elif obj.transaction_type in ['WALLET_TO_MPESA', 'WALLET_TO_BANK']:
+			return 'OUTGOING'
+		
+		# For system transactions (refunds, reversals, adjustments)
+		elif obj.transaction_type in ['REFUND', 'REVERSAL', 'ADJUSTMENT']:
+			if obj.to_wallet == user_wallet:
+				return 'INCOMING'
+			elif obj.from_wallet == user_wallet:
+				return 'OUTGOING'
+		
+		# For fee transactions
+		elif obj.transaction_type == 'FEE':
+			return 'OUTGOING'  # Fees are always outgoing
+		
+		return 'UNKNOWN'
+	
+	def get_other_party_info(self, obj):
+		"""Get information about the other party in the transaction."""
+		request = self.context.get('request')
+		if not request or not request.user:
+			return None
+		
+		try:
+			user_wallet = Wallet.objects.get(user=request.user, status='ACTIVE')
+		except Wallet.DoesNotExist:
+			return None
+		
+		# For wallet-to-wallet transfers
+		if obj.transaction_type == 'WALLET_TO_WALLET':
+			if obj.from_wallet == user_wallet and obj.to_wallet:
+				# Outgoing - show recipient info
+				return {
+					'wallet_id': str(obj.to_wallet.wallet_id),
+					'user_name': obj.to_wallet.user.get_full_name() if obj.to_wallet.user else None,
+					'phone': obj.to_wallet.user.mobile if obj.to_wallet.user else None
+				}
+			elif obj.to_wallet == user_wallet and obj.from_wallet:
+				# Incoming - show sender info
+				return {
+					'wallet_id': str(obj.from_wallet.wallet_id),
+					'user_name': obj.from_wallet.user.get_full_name() if obj.from_wallet.user else None,
+					'phone': obj.from_wallet.user.mobile if obj.from_wallet.user else None
+				}
+		
+		# For MPESA transfers
+		elif obj.transaction_type == 'WALLET_TO_MPESA':
+			return {
+				'phone': obj.deliver_to_phone,
+				'contact_name': obj.contact.name if obj.contact else None
+			}
+		
+		# For system transactions
+		elif obj.transaction_type in ['REFUND', 'REVERSAL', 'ADJUSTMENT']:
+			return {
+				'type': 'SYSTEM',
+				'description': obj.description
+			}
+		
+		return None
 
 
 class WalletToWalletTransferSerializer(serializers.Serializer):

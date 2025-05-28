@@ -7,9 +7,13 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status, generics
+from django.db.models import Q, Sum, Count
+from itertools import chain
+from operator import attrgetter
+from decimal import Decimal
 
 from .core import TransactionHistoryPagination
-from ..models import Transaction, Wallet, CustomerProfile, UserContact
+from ..models import Transaction, Wallet, CustomerProfile, UserContact, TopUpTransaction
 from core_apps.users.models import User
 from ..serializers import (
     TransactionSerializer, 
@@ -405,14 +409,34 @@ class MpesaWithdrawalWebhookAPIView(APIView):
 
 
 class TransactionHistoryAPIView(generics.ListAPIView):
-    """API view for listing user's transaction history."""
+    """API view for listing user's complete transaction history."""
     permission_classes = [IsAuthenticated]
     serializer_class = TransactionSerializer
     pagination_class = TransactionHistoryPagination
     
     def get_queryset(self):
         user = self.request.user
-        return Transaction.objects.filter(user=user).order_by('-created_at')
+        
+        # Get user's active wallet
+        try:
+            wallet = Wallet.objects.get(user=user, status='ACTIVE')
+        except Wallet.DoesNotExist:
+            return Transaction.objects.none()
+        
+        # Get all transactions where user's wallet is involved (both incoming and outgoing)
+        # This includes:
+        # 1. Transactions initiated by the user (user=user)
+        # 2. Incoming wallet-to-wallet transfers (to_wallet=user's wallet)
+        # 3. System transactions affecting user's wallet (refunds, reversals, adjustments)
+        from django.db.models import Q
+        
+        queryset = Transaction.objects.filter(
+            Q(user=user) |  # Transactions initiated by user
+            Q(from_wallet=wallet) |  # Outgoing from user's wallet
+            Q(to_wallet=wallet)  # Incoming to user's wallet
+        ).distinct().order_by('-created_at')
+        
+        return queryset
 
 
 class GetWithdrawalFeeAPIView(APIView):
@@ -533,3 +557,228 @@ class ContactTransactionHistoryAPIView(generics.ListAPIView):
 
         # Filter transactions linked to this user and this contact
         return Transaction.objects.filter(user=user, contact=contact).order_by('-created_at')
+
+
+class ComprehensiveWalletHistoryAPIView(generics.ListAPIView):
+    """
+    API view for listing complete wallet history including both 
+    Transfer transactions and TopUp transactions in chronological order.
+    """
+    permission_classes = [IsAuthenticated]
+    pagination_class = TransactionHistoryPagination
+    
+    def get_queryset(self):
+        user = self.request.user
+        
+        # Get user's active wallet
+        try:
+            wallet = Wallet.objects.get(user=user, status='ACTIVE')
+        except Wallet.DoesNotExist:
+            return []
+        
+        # Get all Transfer transactions where user's wallet is involved
+        transfer_transactions = Transaction.objects.filter(
+            Q(user=user) |  # Transactions initiated by user
+            Q(from_wallet=wallet) |  # Outgoing from user's wallet
+            Q(to_wallet=wallet)  # Incoming to user's wallet
+        ).distinct()
+        
+        # Get all TopUp transactions for user's wallet
+        topup_transactions = TopUpTransaction.objects.filter(wallet=wallet)
+        
+        # Combine and sort by created_at
+        combined_transactions = sorted(
+            chain(transfer_transactions, topup_transactions),
+            key=attrgetter('created_at'),
+            reverse=True
+        )
+        
+        return combined_transactions
+    
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        
+        # Apply pagination
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serialized_data = []
+            for transaction in page:
+                if isinstance(transaction, Transaction):
+                    serializer = TransactionSerializer(transaction)
+                    data = serializer.data
+                    data['transaction_category'] = 'TRANSFER'
+                elif isinstance(transaction, TopUpTransaction):
+                    # Create a unified format for TopUp transactions
+                    data = {
+                        'transaction_id': str(transaction.payment_id),
+                        'transaction_type': 'TOPUP',
+                        'amount': transaction.amount,
+                        'fee': transaction.fee,
+                        'currency': transaction.currency,
+                        'status': transaction.status,
+                        'description': transaction.description,
+                        'created_at': transaction.created_at,
+                        'from_wallet_id': None,
+                        'to_wallet_id': str(transaction.wallet.wallet_id),
+                        'deliver_to_phone': None,
+                        'gateway_transaction_id': transaction.gateway_transaction_id,
+                        'contact_name': None,
+                        'contact_phone': None,
+                        'transaction_category': 'TOPUP'
+                    }
+                serialized_data.append(data)
+            
+            return self.get_paginated_response(serialized_data)
+        
+        # If no pagination, return all data
+        serialized_data = []
+        for transaction in queryset:
+            if isinstance(transaction, Transaction):
+                serializer = TransactionSerializer(transaction)
+                data = serializer.data
+                data['transaction_category'] = 'TRANSFER'
+            elif isinstance(transaction, TopUpTransaction):
+                data = {
+                    'transaction_id': str(transaction.payment_id),
+                    'transaction_type': 'TOPUP',
+                    'amount': transaction.amount,
+                    'fee': transaction.fee,
+                    'currency': transaction.currency,
+                    'status': transaction.status,
+                    'description': transaction.description,
+                    'created_at': transaction.created_at,
+                    'from_wallet_id': None,
+                    'to_wallet_id': str(transaction.wallet.wallet_id),
+                    'deliver_to_phone': None,
+                    'gateway_transaction_id': transaction.gateway_transaction_id,
+                    'contact_name': None,
+                    'contact_phone': None,
+                    'transaction_category': 'TOPUP'
+                }
+            serialized_data.append(data)
+        
+        return Response(serialized_data)
+
+
+class WalletTransactionSummaryAPIView(APIView):
+    """
+    API view for getting wallet transaction summary and statistics.
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        user = request.user
+        
+        # Get user's active wallet
+        try:
+            wallet = Wallet.objects.get(user=user, status='ACTIVE')
+        except Wallet.DoesNotExist:
+            return Response({"error": "No active wallet found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Get date range from query params (optional)
+        from_date = request.query_params.get('from_date')
+        to_date = request.query_params.get('to_date')
+        
+        # Base querysets
+        transfer_qs = Transaction.objects.filter(
+            Q(user=user) | Q(from_wallet=wallet) | Q(to_wallet=wallet)
+        ).distinct()
+        
+        topup_qs = TopUpTransaction.objects.filter(wallet=wallet)
+        
+        # Apply date filters if provided
+        if from_date:
+            transfer_qs = transfer_qs.filter(created_at__gte=from_date)
+            topup_qs = topup_qs.filter(created_at__gte=from_date)
+        
+        if to_date:
+            transfer_qs = transfer_qs.filter(created_at__lte=to_date)
+            topup_qs = topup_qs.filter(created_at__lte=to_date)
+        
+        # Calculate transfer statistics
+        outgoing_transfers = transfer_qs.filter(from_wallet=wallet)
+        incoming_transfers = transfer_qs.filter(to_wallet=wallet)
+        
+        outgoing_stats = outgoing_transfers.aggregate(
+            total_amount=Sum('amount'),
+            total_fees=Sum('fee'),
+            count=Count('id')
+        )
+        
+        incoming_stats = incoming_transfers.aggregate(
+            total_amount=Sum('amount'),
+            count=Count('id')
+        )
+        
+        # Calculate topup statistics
+        topup_stats = topup_qs.filter(status='SUCCESSFUL').aggregate(
+            total_amount=Sum('amount'),
+            total_fees=Sum('fee'),
+            count=Count('id')
+        )
+        
+        # Transaction type breakdown
+        transaction_types = transfer_qs.values('transaction_type').annotate(
+            count=Count('id'),
+            total_amount=Sum('amount')
+        )
+        
+        # Status breakdown
+        status_breakdown = transfer_qs.values('status').annotate(
+            count=Count('id')
+        )
+        
+        # Recent activity (last 7 days)
+        from datetime import datetime, timedelta
+        seven_days_ago = datetime.now() - timedelta(days=7)
+        
+        recent_transfers = transfer_qs.filter(created_at__gte=seven_days_ago).count()
+        recent_topups = topup_qs.filter(created_at__gte=seven_days_ago).count()
+        
+        summary = {
+            "wallet_info": {
+                "wallet_id": str(wallet.wallet_id),
+                "current_balance": float(wallet.current_balance),
+                "available_balance": float(wallet.available_balance),
+                "currency": wallet.currency
+            },
+            "outgoing_transfers": {
+                "total_amount": float(outgoing_stats['total_amount'] or 0),
+                "total_fees": float(outgoing_stats['total_fees'] or 0),
+                "count": outgoing_stats['count']
+            },
+            "incoming_transfers": {
+                "total_amount": float(incoming_stats['total_amount'] or 0),
+                "count": incoming_stats['count']
+            },
+            "topups": {
+                "total_amount": float(topup_stats['total_amount'] or 0),
+                "total_fees": float(topup_stats['total_fees'] or 0),
+                "count": topup_stats['count']
+            },
+            "transaction_types": [
+                {
+                    "type": item['transaction_type'],
+                    "count": item['count'],
+                    "total_amount": float(item['total_amount'] or 0)
+                }
+                for item in transaction_types
+            ],
+            "status_breakdown": [
+                {
+                    "status": item['status'],
+                    "count": item['count']
+                }
+                for item in status_breakdown
+            ],
+            "recent_activity": {
+                "transfers_last_7_days": recent_transfers,
+                "topups_last_7_days": recent_topups
+            },
+            "date_range": {
+                "from_date": from_date,
+                "to_date": to_date
+            }
+        }
+        
+        return Response(summary, status=status.HTTP_200_OK)

@@ -14,7 +14,8 @@ from .transaction import (
     WalletToWalletTransferAPIView,
     WalletToMpesaTransferAPIView,
     MpesaWithdrawalWebhookAPIView,
-    TransactionHistoryAPIView
+    TransactionHistoryAPIView,
+    ComprehensiveWalletHistoryAPIView
 )
 
 from .mpin import (

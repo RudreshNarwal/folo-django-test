@@ -224,13 +224,21 @@ class UserContact(models.Model):
 class Transaction(models.Model):
 	TRANSACTION_TYPES = [
 		('WALLET_TO_WALLET', 'Wallet to Wallet Transfer'),
-		('WALLET_TO_MPESA', 'Wallet to MPESA Transfer')
+		('WALLET_TO_MPESA', 'Wallet to MPESA Transfer'),
+		('WALLET_TO_BANK', 'Wallet to Bank Transfer'),  # Added for EFT transfers
+		('REFUND', 'Refund Transaction'),  # Added for refunds
+		('REVERSAL', 'Transaction Reversal'),  # Added for reversals
+		('ADJUSTMENT', 'Administrative Adjustment'),  # Added for manual adjustments
+		('FEE', 'Transaction Fee'),  # Added for standalone fee transactions
 	]
 	
 	STATUS_CHOICES = [
 		('PENDING', 'Pending'),
 		('SUCCESSFUL', 'Successful'),
 		('FAILED', 'Failed'),
+		('EXPIRED', 'Expired'),  # Added for expired transactions
+		('PARTIAL', 'Partially Completed'),  # Added for partial transactions
+		('REVERSED', 'Reversed'),  # Added for reversed transactions
 	]
 	
 	transaction_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)

@@ -5,7 +5,7 @@ from django.urls import path
 from .views import (
     CreateCustomerWalletAPIView, FinalizeRegistrationAPIView, TopUpStatusAPIView,
     UserWalletAPIView, WalletDetailsAPIView, WalletTransactionHistoryAPIView,
-    TopUpMoneyAPIView, TopUpWebhookAPIView
+    TopUpMoneyAPIView, TopUpWebhookAPIView, WalletMovementCallbackAPIView
 )
 # Import from views/transaction.py (new file)
 from .views.transaction import (
@@ -13,6 +13,8 @@ from .views.transaction import (
     WalletToMpesaTransferAPIView,
     MpesaWithdrawalWebhookAPIView,
     TransactionHistoryAPIView, # General history
+    ComprehensiveWalletHistoryAPIView, # Complete wallet history
+    WalletTransactionSummaryAPIView, # Transaction summary and statistics
     GetWithdrawalFeeAPIView,
     # New contact-related views
     RecentContactsAPIView,
@@ -37,8 +39,12 @@ urlpatterns = [
     path('transfers/wallet-to-wallet/', WalletToWalletTransferAPIView.as_view(), name='wallet-to-wallet-transfer'),
     path('transfers/wallet-to-mpesa/', WalletToMpesaTransferAPIView.as_view(), name='wallet-to-mpesa-transfer'),
     path('transfers/mpesa-webhook/', MpesaWithdrawalWebhookAPIView.as_view(), name='mpesa-withdrawal-webhook'),
-    path('transfers/history/', TransactionHistoryAPIView.as_view(), name='transaction-history'), # Kept old name for general history
+    path('transfers/history/', TransactionHistoryAPIView.as_view(), name='transaction-history'), # Transfer transactions only
     path('transfers/withdrawal-fee/', GetWithdrawalFeeAPIView.as_view(), name='withdrawal-fee'),
+
+    # Complete wallet history endpoint
+    path('history/', ComprehensiveWalletHistoryAPIView.as_view(), name='comprehensive-wallet-history'),
+    path('history/summary/', WalletTransactionSummaryAPIView.as_view(), name='wallet-transaction-summary'),
 
     # Contact Management & History Endpoints
     path('contacts/recent/', RecentContactsAPIView.as_view(), name='recent-contacts'),
@@ -47,4 +53,7 @@ urlpatterns = [
 
     # MPIN management endpoint
     path('mpin/update/', UpdateWalletMpinAPIView.as_view(), name='update-wallet-mpin'),
+    
+    # Wallet movement callback endpoint
+    path('movement/callback/', WalletMovementCallbackAPIView.as_view(), name='wallet-movement-callback'),
 ]

@@ -484,7 +484,7 @@ class TopUpMoneyAPIView(APIView):
 			"phone": phone,
 			"externalWalletType": "SFCM",
 			"description": description,
-			"type": "KE_DTB_STK_PUSH"
+			"type": "KE_DTB_MPESA_PROMPT"
 		}
 		
 		kyc_service = DTBService()

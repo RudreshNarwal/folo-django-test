@@ -217,7 +217,8 @@ class WalletToMpesaTransferAPIView(APIView):
         )
 
         # Prepare payload for DTB service
-        callback_url = settings.WALLET_WITHDRAWAL_CALLBACK_URL
+        # callback_url = settings.WALLET_WITHDRAWAL_CALLBACK_URL
+        callback_url = 'https://webhook.site/b29c3860-7032-41ca-8c88-753f2f5655da'
         payload = {
             "deliverToPhone": phone_number,
             "reference": reference,
@@ -230,9 +231,13 @@ class WalletToMpesaTransferAPIView(APIView):
 
         try:
             response = dtb_service.wallet_to_mpesa_transfer(from_wallet_id, payload)
-
-            if response.get('status') == 'SUCCESSFUL':
-                transaction.status = 'SUCCESSFUL'
+            # Save tracing context if present
+            if 'tracingContext' in response:
+                transaction.tracing_context = response.get('tracingContext')
+            # Update to handle both SUCCESSFUL and PENDING as valid states
+            if response.get('status') in ['SUCCESSFUL', 'PENDING']:
+                # Set transaction status based on response status
+                transaction.status = response.get('status')
                 transaction.withdrawal_id = response.get('withdrawalId')
                 transaction.gateway = response.get('gateway')
                 transaction.gateway_transaction_id = response.get('gatewayTransactionId')
@@ -246,8 +251,12 @@ class WalletToMpesaTransferAPIView(APIView):
                 from_wallet.current_balance = wallet_details['currentBalance']
                 from_wallet.save()
 
+                status_message = "MPESA withdrawal initiated successfully" 
+                if response.get('status') == 'PENDING':
+                    status_message = "MPESA withdrawal is being processed"
+
                 return Response({
-                    "message": "MPESA withdrawal initiated successfully",
+                    "message": status_message,
                     "transaction_id": str(transaction.transaction_id),
                     "withdrawal_id": transaction.withdrawal_id,
                     "amount": float(amount),
@@ -262,7 +271,7 @@ class WalletToMpesaTransferAPIView(APIView):
                 if 'extraInfo' in response:
                     transaction.extra_info = response.get('extraInfo')
                 transaction.save()
-                logger.error(f"DTB MPESA Transfer initiation failed: {response}")
+                logger.error(f"DTB MPESA Transfer initiation failed for transaction {transaction.transaction_id}: {response}")
                 return Response({
                     "error": "MPESA withdrawal initiation failed",
                     "transaction_id": str(transaction.transaction_id),
@@ -270,15 +279,40 @@ class WalletToMpesaTransferAPIView(APIView):
                     "details": response.get('extraInfo', response) # Show extraInfo if available
                 }, status=status.HTTP_400_BAD_REQUEST)
 
-        except (DTBServiceAuthenticationError, DTBServiceAPIError, Exception) as e:
+        except (DTBServiceAuthenticationError, DTBServiceAPIError) as e:
             transaction.status = 'FAILED'
             transaction.save()
-            logger.error(f"Error during wallet-to-MPESA transfer: {e}")
-            error_message = str(e) if isinstance(e, (DTBServiceAuthenticationError, DTBServiceAPIError)) else "An unexpected error occurred"
+            error_message = str(e)
+            # Check if the error message indicates a duplicate external ID from DTB
+            # The specific error message structure from DTB might vary.
+            if "Duplicate entry" in error_message and "withdrawal.unique_id" in error_message:
+                logger.warning(
+                    f"DTB reported a duplicate externalUniqueId for local transaction {transaction.transaction_id} "
+                    f"(external_unique_id sent: {external_unique_id}). This likely means the request was already processed "
+                    f"or registered by DTB. DTB Error: {error_message}"
+                )
+            else:
+                logger.error(
+                    f"DTB API Error during wallet-to-MPESA transfer for local transaction {transaction.transaction_id} "
+                    f"(external_unique_id sent: {external_unique_id}). Error: {e}"
+                )
+            
             return Response({
-                "error": error_message,
+                "error": error_message, # You might choose to return a more generic message for duplicates if desired
                 "transaction_id": str(transaction.transaction_id)
-            }, status=status.HTTP_400_BAD_REQUEST if isinstance(e, (DTBServiceAuthenticationError, DTBServiceAPIError)) else status.HTTP_500_INTERNAL_SERVER_ERROR)
+            }, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            # Handle unexpected errors
+            transaction.status = 'FAILED'
+            transaction.save()
+            logger.error(
+                f"Unexpected error during wallet-to-MPESA transfer for local transaction {transaction.transaction_id} "
+                f"(external_unique_id sent: {external_unique_id}): {e}"
+            )
+            return Response({
+                "error": "An unexpected error occurred",
+                "transaction_id": str(transaction.transaction_id)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class MpesaWithdrawalWebhookAPIView(APIView):
@@ -288,7 +322,9 @@ class MpesaWithdrawalWebhookAPIView(APIView):
     """
     def post(self, request):
         data = request.data
-        withdrawal_id = data.get('withdrawalId')
+        # Handle both old format (withdrawalId) and new format (paymentId)
+        payment_id = data.get('paymentId')
+        withdrawal_id = data.get('withdrawalId', payment_id)  # Use paymentId as fallback
         external_unique_id = data.get('externalUniqueId')
         status_value = data.get('status')
         
@@ -306,18 +342,46 @@ class MpesaWithdrawalWebhookAPIView(APIView):
             
             # Update transaction status
             transaction.status = 'SUCCESSFUL' if status_value == 'SUCCESSFUL' else 'FAILED'
-            transaction.withdrawal_id = withdrawal_id
             
-            # Update other fields if available
-            if data.get('gateway'):
-                transaction.gateway = data.get('gateway')
-            if data.get('gatewayTransactionId'):
-                transaction.gateway_transaction_id = data.get('gatewayTransactionId')
-            if data.get('fee'):
+            # Handle payment_id if present (new format)
+            if payment_id:
+                transaction.external_reference_id = str(payment_id)
+            
+            # Still save withdrawal_id if present (for backward compatibility)
+            if withdrawal_id:
+                transaction.withdrawal_id = withdrawal_id
+            
+            # Update other fields based on new response format
+            if data.get('merchantName'):
+                # Store merchant info in extra_info if not already present
+                if not transaction.extra_info:
+                    transaction.extra_info = {}
+                transaction.extra_info['merchantName'] = data.get('merchantName')
+                transaction.extra_info['merchantId'] = data.get('merchantId', '')
+            
+            # Handle payment instrument info (contains phone number)
+            payment_instrument_info = data.get('paymentInstrumentInfo', {})
+            if payment_instrument_info.get('externalWalletId'):
+                # This is the phone number in the format 2547XXXXXXX
+                phone_number = payment_instrument_info.get('externalWalletId')
+                if not transaction.deliver_to_phone:
+                    transaction.deliver_to_phone = phone_number
+            
+            # Update fee
+            if data.get('fee') is not None:
                 transaction.fee = data.get('fee')
-            if data.get('extraInfo'):
-                transaction.extra_info = data.get('extraInfo')
-                
+            
+            # Store additional fields in extra_info
+            if not transaction.extra_info:
+                transaction.extra_info = {}
+            transaction.extra_info['paymentType'] = data.get('paymentType')
+            transaction.extra_info['created'] = data.get('created')
+            transaction.extra_info['errorDescription'] = data.get('errorDescription', '')
+            
+            # Store payment reference if available
+            if data.get('paymentReference'):
+                transaction.reference = data.get('paymentReference')
+            
             transaction.save()
             
             # If transaction is successful, update wallet balance

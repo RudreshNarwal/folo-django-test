@@ -261,6 +261,7 @@ class Transaction(models.Model):
 	webhook_response = models.JSONField(null=True, blank=True, help_text="Webhook response data for the transaction")
 	withdrawal_id = models.PositiveIntegerField(null=True, blank=True, help_text="ID for MPESA withdrawals")
 	contact = models.ForeignKey(UserContact, on_delete=models.PROTECT, null=True, blank=True, related_name='transactions')
+	tracing_context = models.CharField(max_length=100, null=True, blank=True, help_text="Tracing context from provider for debugging")
 	
 	def __str__(self):
 		return f"Transaction {self.transaction_id} ({self.transaction_type}) - {self.status}"

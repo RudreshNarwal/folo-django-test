@@ -231,6 +231,67 @@ class DTBService:
         response = self.request_with_retries('GET', url, headers=self.headers, params=params)
         return response.json()
     
+    def wallet_to_pesalink_transfer(self, wallet_id, payload):
+        """
+        Transfer funds from wallet to bank account via PesaLink
+        
+        Payload should include:
+        - amount: Amount to transfer
+        - type: "KE_DTB_PESALINK"
+        - description: Description of the transaction
+        - externalUniqueId: Unique ID for the transaction
+        - accountNumber: Bank account number
+        - branchCode: Branch code
+        - accountCurrency: Account currency (e.g., "KES")
+        - bank: Bank code
+        - reference: Reference for the transaction
+        - callbackUrl: URL for callback notifications
+        """
+        url = f'{self.BASE_URL}/tenants/{self.TENANT_ID}/wallets/{wallet_id}/withdrawals'
+        response = self.request_with_retries('POST', url, json=payload, headers=self.headers)
+        return response.json()
+        
+    def wallet_to_eft_transfer(self, wallet_id, payload):
+        """
+        Transfer funds from wallet to bank account via EFT
+        
+        Payload should include:
+        - accountName: Account holder name
+        - accountNumber: Bank account number
+        - branchCode: Branch code
+        - bankCode: Bank code
+        - amount: Amount to transfer
+        - callbackUrl: URL for callback notifications
+        - deliverToPhone: Phone number (optional)
+        - description: Description of the transaction
+        - externalUniqueId: Unique ID for the transaction
+        - location: Location (e.g., "kenya")
+        - reference: Reference for the transaction
+        - type: "KE_DTB_EFT"
+        - currency: Currency (e.g., "KES")
+        """
+        url = f'{self.BASE_URL}/tenants/{self.TENANT_ID}/wallets/{wallet_id}/withdrawals'
+        response = self.request_with_retries('POST', url, json=payload, headers=self.headers)
+        return response.json()
+        
+    def get_bank_transfer_fee(self, wallet_id, amount, transfer_type="KE_DTB_PESALINK"):
+        """
+        Get the fee for a specific bank transfer amount and type
+        
+        Parameters:
+        - wallet_id: ID of the wallet
+        - amount: Amount to transfer
+        - transfer_type: Type of transfer (KE_DTB_PESALINK or KE_DTB_EFT)
+        
+        Returns a dict with 'feeAmount' key
+        """
+        url = f'{self.BASE_URL}/tenants/{self.TENANT_ID}/wallets/{wallet_id}/withdrawals/fees'
+        params = {
+            'amount': amount,
+            'type': transfer_type
+        }
+        response = self.request_with_retries('GET', url, headers=self.headers, params=params)
+        return response.json()
 
 
 class DTBServiceError(Exception):

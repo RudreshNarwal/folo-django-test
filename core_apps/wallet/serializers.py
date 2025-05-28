@@ -2,7 +2,7 @@ from django.core.validators import RegexValidator
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django_countries.serializers import CountryFieldMixin
-from .models import CustomerProfile, ProviderDocument, TopUpTransaction, Transaction, Wallet, UserContact, WalletType
+from .models import CustomerProfile, ProviderDocument, TopUpTransaction, Transaction, Wallet, UserContact, WalletType, BankBeneficiary
 
 User = get_user_model()
 
@@ -81,6 +81,7 @@ class TransactionSerializer(serializers.ModelSerializer):
 	to_wallet_id = serializers.CharField(source='to_wallet.wallet_id', read_only=True, allow_null=True)
 	contact_name = serializers.CharField(source='contact.name', read_only=True, allow_null=True)
 	contact_phone = serializers.CharField(source='contact.phone_number', read_only=True, allow_null=True)
+	bank_beneficiary_info = serializers.SerializerMethodField()
 	transaction_direction = serializers.SerializerMethodField()
 	other_party_info = serializers.SerializerMethodField()
 	
@@ -90,9 +91,23 @@ class TransactionSerializer(serializers.ModelSerializer):
 			'transaction_id', 'transaction_type', 'amount', 'fee', 'currency',
 			'status', 'description', 'created_at', 'from_wallet_id',
 			'to_wallet_id', 'deliver_to_phone', 'gateway_transaction_id',
-			'contact_name', 'contact_phone', 'transaction_direction', 'other_party_info'
+			'contact_name', 'contact_phone', 'bank_beneficiary_info',
+			'transaction_direction', 'other_party_info'
 		]
 		read_only_fields = fields
+	
+	def get_bank_beneficiary_info(self, obj):
+		"""Get bank beneficiary information for bank transfers."""
+		if obj.bank_beneficiary:
+			return {
+				'id': obj.bank_beneficiary.id,
+				'account_holder_name': obj.bank_beneficiary.account_holder_name,
+				'account_number': obj.bank_beneficiary.account_number,
+				'bank_name': obj.bank_beneficiary.bank_name,
+				'branch_name': obj.bank_beneficiary.branch_name,
+				'nickname': obj.bank_beneficiary.nickname
+			}
+		return None
 	
 	def get_transaction_direction(self, obj):
 		"""Determine if this is an incoming or outgoing transaction for the current user."""
@@ -112,8 +127,8 @@ class TransactionSerializer(serializers.ModelSerializer):
 			elif obj.to_wallet == user_wallet:
 				return 'INCOMING'
 		
-		# For MPESA and bank transfers (always outgoing from user's perspective)
-		elif obj.transaction_type in ['WALLET_TO_MPESA', 'WALLET_TO_BANK']:
+		# For MPESA, bank, and PesaLink transfers (always outgoing from user's perspective)
+		elif obj.transaction_type in ['WALLET_TO_MPESA', 'WALLET_TO_BANK', 'WALLET_TO_PESALINK']:
 			return 'OUTGOING'
 		
 		# For system transactions (refunds, reversals, adjustments)
@@ -163,6 +178,17 @@ class TransactionSerializer(serializers.ModelSerializer):
 				'phone': obj.deliver_to_phone,
 				'contact_name': obj.contact.name if obj.contact else None
 			}
+		
+		# For bank transfers (PesaLink and EFT)
+		elif obj.transaction_type in ['WALLET_TO_BANK', 'WALLET_TO_PESALINK']:
+			if obj.bank_beneficiary:
+				return {
+					'account_holder_name': obj.bank_beneficiary.account_holder_name,
+					'account_number': obj.bank_beneficiary.account_number,
+					'bank_name': obj.bank_beneficiary.bank_name,
+					'branch_name': obj.bank_beneficiary.branch_name,
+					'nickname': obj.bank_beneficiary.nickname
+				}
 		
 		# For system transactions
 		elif obj.transaction_type in ['REFUND', 'REVERSAL', 'ADJUSTMENT']:
@@ -342,3 +368,159 @@ class UserContactSerializer(serializers.ModelSerializer):
 		model = UserContact
 		fields = ['id', 'name', 'phone_number', 'last_used']
 		read_only_fields = ['id', 'last_used']
+
+
+class BankBeneficiarySerializer(serializers.ModelSerializer):
+	"""Serializer for bank beneficiary management."""
+	
+	class Meta:
+		model = BankBeneficiary
+		fields = [
+			'id', 'account_holder_name', 'account_number', 'bank_code', 
+			'branch_code', 'bank_name', 'branch_name', 'nickname', 
+			'is_active', 'created_at', 'updated_at', 'last_used'
+		]
+		read_only_fields = ['id', 'created_at', 'updated_at', 'last_used']
+	
+	def validate(self, data):
+		# Ensure the beneficiary belongs to the requesting user
+		request = self.context.get('request')
+		if request and request.user:
+			# Check for duplicate account for the same user
+			user = request.user
+			account_number = data.get('account_number')
+			bank_code = data.get('bank_code')
+			
+			# For updates, exclude the current instance
+			queryset = BankBeneficiary.objects.filter(
+				user=user, 
+				account_number=account_number, 
+				bank_code=bank_code
+			)
+			if self.instance:
+				queryset = queryset.exclude(id=self.instance.id)
+			
+			if queryset.exists():
+				raise serializers.ValidationError(
+					"You already have this bank account as a beneficiary."
+				)
+		
+		return data
+
+
+class CreateBankBeneficiarySerializer(serializers.ModelSerializer):
+	"""Serializer for creating new bank beneficiaries."""
+	
+	class Meta:
+		model = BankBeneficiary
+		fields = [
+			'account_holder_name', 'account_number', 'bank_code', 
+			'branch_code', 'bank_name', 'branch_name', 'nickname'
+		]
+	
+	def validate_account_number(self, value):
+		if not value or not value.isdigit():
+			raise serializers.ValidationError("Account number must contain only digits.")
+		if len(value) < 8 or len(value) > 20:
+			raise serializers.ValidationError("Account number must be between 8 and 20 digits.")
+		return value
+	
+	def validate_bank_code(self, value):
+		if not value or not value.isdigit():
+			raise serializers.ValidationError("Bank code must contain only digits.")
+		return value
+	
+	def validate_branch_code(self, value):
+		if not value or not value.isdigit():
+			raise serializers.ValidationError("Branch code must contain only digits.")
+		return value
+
+
+class WalletToBankTransferSerializer(serializers.Serializer):
+	"""Serializer for wallet to bank transfers (both PesaLink and EFT)."""
+	
+	TRANSFER_TYPES = [
+		('PESALINK', 'PesaLink Transfer'),
+		('EFT', 'Electronic Funds Transfer'),
+	]
+	
+	beneficiary_id = serializers.IntegerField(help_text="ID of the bank beneficiary")
+	amount = serializers.DecimalField(
+		max_digits=20, decimal_places=2, min_value=1, max_value=1000000
+	)
+	transfer_type = serializers.ChoiceField(choices=TRANSFER_TYPES)
+	description = serializers.CharField(max_length=200, required=False, allow_blank=True)
+	reference = serializers.CharField(max_length=100, required=False, allow_blank=True)
+	mpin = serializers.CharField(write_only=True, min_length=4, max_length=6)
+	
+	def validate(self, data):
+		request = self.context.get('request')
+		if not request or not request.user:
+			raise serializers.ValidationError("User context is required.")
+		
+		user = request.user
+		mpin = data.get('mpin')
+		beneficiary_id = data.get('beneficiary_id')
+		
+		# Validate user's active wallet and MPIN
+		try:
+			self.wallet = Wallet.objects.get(user=user, status='ACTIVE')
+			if not self.wallet.mpin:
+				raise serializers.ValidationError("MPIN is not set for your wallet. Please set it first.")
+			if mpin != self.wallet.mpin:
+				raise serializers.ValidationError("Invalid MPIN.")
+		except Wallet.DoesNotExist:
+			raise serializers.ValidationError("No active wallet found for your account.")
+		except Wallet.MultipleObjectsReturned:
+			self.wallet = Wallet.objects.filter(user=user, status='ACTIVE').first()
+			if not self.wallet:
+				raise serializers.ValidationError("No active wallet found for your account.")
+			if not self.wallet.mpin:
+				raise serializers.ValidationError("MPIN is not set for your wallet. Please set it first.")
+			if mpin != self.wallet.mpin:
+				raise serializers.ValidationError("Invalid MPIN.")
+		
+		# Validate beneficiary belongs to user and is active
+		try:
+			self.beneficiary = BankBeneficiary.objects.get(
+				id=beneficiary_id, user=user, is_active=True
+			)
+		except BankBeneficiary.DoesNotExist:
+			raise serializers.ValidationError("Invalid beneficiary or beneficiary not found.")
+		
+		# Check if amount exceeds available balance
+		if data['amount'] > self.wallet.available_balance:
+			raise serializers.ValidationError(
+				f"Insufficient balance. Available: {self.wallet.available_balance}"
+			)
+		
+		# Set minimum amounts based on transfer type
+		if data['transfer_type'] == 'PESALINK' and data['amount'] < 10:
+			raise serializers.ValidationError("Minimum amount for PesaLink transfer is KES 10.")
+		elif data['transfer_type'] == 'EFT' and data['amount'] < 100:
+			raise serializers.ValidationError("Minimum amount for EFT transfer is KES 100.")
+		
+		return data
+
+
+class BankTransferFeeRequestSerializer(serializers.Serializer):
+	"""Serializer for requesting bank transfer fees."""
+	
+	TRANSFER_TYPES = [
+		('PESALINK', 'PesaLink Transfer'),
+		('EFT', 'Electronic Funds Transfer'),
+	]
+	
+	amount = serializers.DecimalField(max_digits=20, decimal_places=2, min_value=1)
+	transfer_type = serializers.ChoiceField(choices=TRANSFER_TYPES)
+	
+	def validate_amount(self, value):
+		if value <= 0:
+			raise serializers.ValidationError("Amount must be greater than 0")
+		return value
+
+
+class BankTransferFeeResponseSerializer(serializers.Serializer):
+	"""Serializer for bank transfer fee responses."""
+	fee_amount = serializers.DecimalField(max_digits=20, decimal_places=2, source="feeAmount")
+	transfer_type = serializers.CharField()

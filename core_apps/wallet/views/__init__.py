@@ -7,7 +7,9 @@ from .core import (
     WalletDetailsAPIView,
     WalletTransactionHistoryAPIView,
     TopUpMoneyAPIView,
-    TopUpWebhookAPIView
+    TopUpWebhookAPIView,
+    WalletMovementCallbackAPIView,
+    ManualRatificationWebhookAPIView
 )
 
 from .transaction import (
@@ -15,9 +17,27 @@ from .transaction import (
     WalletToMpesaTransferAPIView,
     MpesaWithdrawalWebhookAPIView,
     TransactionHistoryAPIView,
-    ComprehensiveWalletHistoryAPIView
+    ComprehensiveWalletHistoryAPIView,
+    WalletTransactionSummaryAPIView,
+    GetWithdrawalFeeAPIView,
+    RecentContactsAPIView,
+    CheckContactWalletAPIView,
+    ContactTransactionHistoryAPIView
 )
 
 from .mpin import (
     UpdateWalletMpinAPIView
+)
+
+from .beneficiary import (
+    BankBeneficiaryListCreateAPIView,
+    BankBeneficiaryDetailAPIView,
+    RecentBankBeneficiariesAPIView,
+    ActivateBankBeneficiaryAPIView
+)
+
+from .bank_transfer import (
+    WalletToBankTransferAPIView,
+    BankTransferWebhookAPIView,
+    GetBankTransferFeeAPIView
 )

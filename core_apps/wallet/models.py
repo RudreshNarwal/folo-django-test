@@ -221,11 +221,41 @@ class UserContact(models.Model):
 		return f"{self.user.get_username()}'s contact: {self.name or self.phone_number}"
 
 
+class BankBeneficiary(models.Model):
+	"""Model to store bank beneficiary details for transfers."""
+	user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='bank_beneficiaries')
+	account_holder_name = models.CharField(max_length=100, help_text="Name of the account holder")
+	account_number = models.CharField(max_length=50, help_text="Bank account number")
+	bank_code = models.CharField(max_length=10, help_text="Bank code (e.g., 0068 for Equity)")
+	branch_code = models.CharField(max_length=10, help_text="Branch code")
+	bank_name = models.CharField(max_length=100, help_text="Name of the bank")
+	branch_name = models.CharField(max_length=100, blank=True, null=True, help_text="Name of the branch")
+	nickname = models.CharField(max_length=50, blank=True, null=True, help_text="User-friendly name for the beneficiary")
+	is_active = models.BooleanField(default=True, help_text="Whether this beneficiary is active")
+	created_at = models.DateTimeField(auto_now_add=True)
+	updated_at = models.DateTimeField(auto_now=True)
+	last_used = models.DateTimeField(null=True, blank=True, help_text="Last time this beneficiary was used")
+	
+	class Meta:
+		verbose_name = "Bank Beneficiary"
+		verbose_name_plural = "Bank Beneficiaries"
+		ordering = ['-last_used', '-created_at']
+		unique_together = ('user', 'account_number', 'bank_code')  # Prevent duplicate accounts
+	
+	def __str__(self):
+		return f"{self.account_holder_name} - {self.account_number} ({self.bank_name})"
+	
+	def get_display_name(self):
+		"""Get a user-friendly display name for the beneficiary."""
+		return self.nickname or f"{self.account_holder_name} - {self.bank_name}"
+
+
 class Transaction(models.Model):
 	TRANSACTION_TYPES = [
 		('WALLET_TO_WALLET', 'Wallet to Wallet Transfer'),
 		('WALLET_TO_MPESA', 'Wallet to MPESA Transfer'),
 		('WALLET_TO_BANK', 'Wallet to Bank Transfer'),  # Added for EFT transfers
+		('WALLET_TO_PESALINK', 'Wallet to PesaLink Transfer'),  # Added for PesaLink transfers
 		('REFUND', 'Refund Transaction'),  # Added for refunds
 		('REVERSAL', 'Transaction Reversal'),  # Added for reversals
 		('ADJUSTMENT', 'Administrative Adjustment'),  # Added for manual adjustments
@@ -269,6 +299,7 @@ class Transaction(models.Model):
 	webhook_response = models.JSONField(null=True, blank=True, help_text="Webhook response data for the transaction")
 	withdrawal_id = models.PositiveIntegerField(null=True, blank=True, help_text="ID for MPESA withdrawals")
 	contact = models.ForeignKey(UserContact, on_delete=models.PROTECT, null=True, blank=True, related_name='transactions')
+	bank_beneficiary = models.ForeignKey(BankBeneficiary, on_delete=models.PROTECT, null=True, blank=True, related_name='transactions', help_text="Bank beneficiary for bank transfers")
 	tracing_context = models.CharField(max_length=100, null=True, blank=True, help_text="Tracing context from provider for debugging")
 	
 	def __str__(self):

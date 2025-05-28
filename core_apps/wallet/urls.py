@@ -5,7 +5,8 @@ from django.urls import path
 from .views import (
     CreateCustomerWalletAPIView, FinalizeRegistrationAPIView, TopUpStatusAPIView,
     UserWalletAPIView, WalletDetailsAPIView, WalletTransactionHistoryAPIView,
-    TopUpMoneyAPIView, TopUpWebhookAPIView, WalletMovementCallbackAPIView
+    TopUpMoneyAPIView, TopUpWebhookAPIView, WalletMovementCallbackAPIView,
+    ManualRatificationWebhookAPIView
 )
 # Import from views/transaction.py (new file)
 from .views.transaction import (
@@ -23,6 +24,21 @@ from .views.transaction import (
 )
 # Import from views/mpin.py
 from .views.mpin import UpdateWalletMpinAPIView
+
+# Import from views/beneficiary.py (bank beneficiary management)
+from .views.beneficiary import (
+    BankBeneficiaryListCreateAPIView,
+    BankBeneficiaryDetailAPIView,
+    RecentBankBeneficiariesAPIView,
+    ActivateBankBeneficiaryAPIView
+)
+
+# Import from views/bank_transfer.py (bank transfers)
+from .views.bank_transfer import (
+    WalletToBankTransferAPIView,
+    BankTransferWebhookAPIView,
+    GetBankTransferFeeAPIView
+)
 
 urlpatterns = [
     path('finalize-registration/', FinalizeRegistrationAPIView.as_view(), name='finalize_registration'),
@@ -42,6 +58,11 @@ urlpatterns = [
     path('transfers/history/', TransactionHistoryAPIView.as_view(), name='transaction-history'), # Transfer transactions only
     path('transfers/withdrawal-fee/', GetWithdrawalFeeAPIView.as_view(), name='withdrawal-fee'),
 
+    # Bank transfer endpoints
+    path('transfers/wallet-to-bank/', WalletToBankTransferAPIView.as_view(), name='wallet-to-bank-transfer'),
+    path('transfers/bank-webhook/', BankTransferWebhookAPIView.as_view(), name='bank-transfer-webhook'),
+    path('transfers/bank-fee/', GetBankTransferFeeAPIView.as_view(), name='bank-transfer-fee'),
+
     # Complete wallet history endpoint
     path('history/', ComprehensiveWalletHistoryAPIView.as_view(), name='comprehensive-wallet-history'),
     path('history/summary/', WalletTransactionSummaryAPIView.as_view(), name='wallet-transaction-summary'),
@@ -51,9 +72,16 @@ urlpatterns = [
     path('contacts/check/', CheckContactWalletAPIView.as_view(), name='check-contact-wallet'),
     path('contacts/<int:contact_id>/history/', ContactTransactionHistoryAPIView.as_view(), name='contact-transaction-history'),
 
+    # Bank Beneficiary Management Endpoints
+    path('beneficiaries/', BankBeneficiaryListCreateAPIView.as_view(), name='bank-beneficiaries-list-create'),
+    path('beneficiaries/<int:pk>/', BankBeneficiaryDetailAPIView.as_view(), name='bank-beneficiary-detail'),
+    path('beneficiaries/recent/', RecentBankBeneficiariesAPIView.as_view(), name='recent-bank-beneficiaries'),
+    path('beneficiaries/<int:pk>/activate/', ActivateBankBeneficiaryAPIView.as_view(), name='activate-bank-beneficiary'),
+
     # MPIN management endpoint
     path('mpin/update/', UpdateWalletMpinAPIView.as_view(), name='update-wallet-mpin'),
     
-    # Wallet movement callback endpoint
+    # Webhook endpoints
     path('movement/callback/', WalletMovementCallbackAPIView.as_view(), name='wallet-movement-callback'),
+    path('kyc/manual-ratification/webhook/', ManualRatificationWebhookAPIView.as_view(), name='manual-ratification-webhook'),
 ]

@@ -971,3 +971,255 @@ class WalletMovementCallbackAPIView(APIView):
 		except Exception as e:
 			logger.error(f"Error processing wallet movement callback: {e}")
 			return Response({"error": "An unexpected error occurred"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ManualRatificationWebhookAPIView(APIView):
+	"""
+	Webhook endpoint for manual ratification notifications from DTB.
+	Handles callbacks when DTB team performs manual ratification for customers.
+	"""
+	
+	def post(self, request):
+		data = request.data
+		event_type = data.get('eventType')
+		tenant_id = data.get('tenantId')
+		created = data.get('created')
+		trace_id = data.get('traceId')
+		
+		# Extract the main data
+		webhook_data = data.get('data', {})
+		ratify_result_data = webhook_data.get('ratifyResultData')
+		
+		# Extract entity information
+		associated_entity_id = data.get('associatedEntityId')
+		associated_entity_type = data.get('associatedEntityType')
+		
+		# Extract instigator information
+		instigator = data.get('instigator', {})
+		instigator_identity = instigator.get('identity')
+		
+		logger.info(f"Manual ratification webhook received: eventType={event_type}, entityId={associated_entity_id}, entityType={associated_entity_type}")
+		
+		try:
+			# Validate event type
+			if event_type != 'user.manual.ratify.create':
+				logger.warning(f"Unexpected event type received: {event_type}")
+				return Response({"message": "Event type not supported"}, status=status.HTTP_200_OK)
+			
+			# Only handle customer ratifications (userId)
+			if associated_entity_type != 'userId':
+				logger.info(f"Skipping ratification for entity type: {associated_entity_type}")
+				return Response({"message": "Entity type not supported"}, status=status.HTTP_200_OK)
+			
+			# Find the customer profile by customer_id
+			try:
+				customer_profile = CustomerProfile.objects.get(customer_id=associated_entity_id)
+			except CustomerProfile.DoesNotExist:
+				logger.error(f"Manual ratification webhook received for unknown customer: {associated_entity_id}")
+				return Response({"error": "Customer not found"}, status=status.HTTP_404_NOT_FOUND)
+			
+			# Parse the ratification result data
+			import json
+			try:
+				ratify_results = json.loads(ratify_result_data) if isinstance(ratify_result_data, str) else ratify_result_data
+			except (json.JSONDecodeError, TypeError) as e:
+				logger.error(f"Failed to parse ratifyResultData: {e}")
+				return Response({"error": "Invalid ratification data format"}, status=status.HTTP_400_BAD_REQUEST)
+			
+			# Check if manual ratification passed
+			manual_ratify_check = ratify_results.get('manualRatify', {})
+			manual_ratify_passed = manual_ratify_check.get('passed', False)
+			
+			# Store the old status for comparison
+			old_status = customer_profile.kyc_status
+			
+			# Update customer profile based on manual ratification result
+			if manual_ratify_passed:
+				customer_profile.kyc_status = 'APPROVED'
+				customer_profile.kyc_failure_stage = None
+				customer_profile.kyc_error_message = None
+				
+				# Store manual ratification details
+				if not customer_profile.kyc_error_message:
+					customer_profile.kyc_error_message = ""
+				
+				# Add manual ratification note
+				manual_ratification_note = f"Manual ratification approved by {instigator_identity} on {created}"
+				if customer_profile.kyc_error_message:
+					customer_profile.kyc_error_message += f"\n{manual_ratification_note}"
+				else:
+					customer_profile.kyc_error_message = manual_ratification_note
+			else:
+				customer_profile.kyc_status = 'FAILED'
+				customer_profile.kyc_failure_stage = 'Manual Ratification'
+				
+				# Extract failed checks for error message
+				failed_checks = []
+				for check_name, check_data in ratify_results.items():
+					if isinstance(check_data, dict) and check_data.get('checked', False) and not check_data.get('passed', False):
+						failed_checks.append(check_name)
+				
+				customer_profile.kyc_error_message = f"Manual ratification failed. Failed checks: {', '.join(failed_checks)}"
+			
+			# Store the complete webhook data for audit purposes
+			webhook_audit = {
+				'timestamp': timezone.now().isoformat(),
+				'event_type': event_type,
+				'trace_id': trace_id,
+				'tenant_id': tenant_id,
+				'instigator': instigator_identity,
+				'ratification_result': manual_ratify_passed,
+				'full_data': data
+			}
+			
+			# Store webhook audit in extra field (you might want to add this field to CustomerProfile model)
+			if not hasattr(customer_profile, 'webhook_audit'):
+				# For now, we'll store it in kyc_error_message as a JSON string
+				# In production, consider adding a dedicated JSONField for webhook_audit
+				pass
+			
+			customer_profile.save()
+			
+			# Log the status change
+			logger.info(f"Manual ratification processed for customer {customer_profile.customer_id}: {old_status} -> {customer_profile.kyc_status}")
+			
+			# Send notification emails and handle wallet creation
+			if customer_profile.kyc_status == 'APPROVED' and old_status != 'APPROVED':
+				# Send success notification
+				send_mail(
+					subject="Manual KYC Ratification Approved - Customer Ready for Wallet Creation",
+					message=f"Customer {customer_profile.customer_id} ({customer_profile.user.get_full_name()}) has been manually approved for KYC by {instigator_identity}. They can now create a wallet.",
+					from_email=settings.DEFAULT_FROM_EMAIL,
+					recipient_list=settings.DEFAULT_EMAIL_RECEIVERS,
+					fail_silently=False,
+				)
+				
+				# Auto-create wallet if customer doesn't have one
+				try:
+					existing_wallet = Wallet.objects.filter(user=customer_profile.user, status='ACTIVE').first()
+					if not existing_wallet:
+						logger.info(f"Attempting to auto-create wallet for manually ratified customer {customer_profile.customer_id}")
+						
+						# Auto-create wallet using the same logic as CreateCustomerWalletAPIView
+						dtb_service = DTBService()
+						
+						try:
+							# Fetch allowed wallet types
+							wallet_types_response = dtb_service.get_wallet_types()
+							wallet_types = wallet_types_response
+							
+							# Select wallet type (using the same logic as CreateCustomerWalletAPIView)
+							selected_wallet_type_id = 2497  # Default wallet type
+							
+							# Create wallet payload
+							wallet_payload = {
+								"externalUniqueId": str(uuid.uuid4()),
+								"status": "ACTIVE",
+								"name": "Cust DTB Wallet",
+								"description": "Auto-created wallet after manual ratification",
+								"walletTypeId": selected_wallet_type_id,
+								"cardType": "virtual",
+								"configuration": []
+							}
+							
+							# Check for existing wallets first
+							try:
+								dtb_wallets = dtb_service.get_wallets(customer_profile.customer_id)
+								existing_wallets = [
+									wallet for wallet in dtb_wallets
+									if wallet.get('walletTypeId') == selected_wallet_type_id and wallet.get('status') == 'ACTIVE'
+								]
+							except Exception as e:
+								logger.error("Error while checking for existing wallets: %s", e)
+								existing_wallets = []
+							
+							if existing_wallets:
+								# Use the first matching wallet from DTB
+								wallet_response = existing_wallets[0]
+								logger.info(f"Found existing DTB wallet for customer {customer_profile.customer_id}")
+							else:
+								# Create a new wallet via DTB API
+								wallet_response = dtb_service.create_wallet(customer_profile.customer_id, wallet_payload)
+								logger.info(f"Created new DTB wallet for customer {customer_profile.customer_id}")
+							
+							# Get or create the WalletType
+							wallet_type_id = wallet_response.get('walletTypeId')
+							try:
+								wallet_type = WalletType.objects.get(wallet_type_id=wallet_type_id)
+							except WalletType.DoesNotExist:
+								logger.error(f"WalletType with ID {wallet_type_id} does not exist locally")
+								raise Exception(f"WalletType with ID {wallet_type_id} does not exist locally")
+							
+							# Create or update the local Wallet record
+							wallet, created = Wallet.objects.update_or_create(
+								wallet_id=wallet_response.get('walletId'),
+								defaults={
+									'user': customer_profile.user,
+									'customer': customer_profile,
+									'wallet_type': wallet_type,
+									'name': wallet_response.get('name'),
+									'description': wallet_response.get('description'),
+									'status': wallet_response.get('status'),
+									'currency': wallet_response.get('currency', 'KES'),
+									'available_balance': wallet_response.get('availableBalance', 0),
+									'current_balance': wallet_response.get('currentBalance', 0),
+									'reservations': wallet_response.get('reservations', 0),
+									'account_number': wallet_response.get('accountNumber'),
+									'external_unique_id': wallet_response.get('externalUniqueId'),
+									'friendly_id': wallet_response.get('friendlyId'),
+									'organisation_id': wallet_response.get('organisationId'),
+									'configuration': wallet_response.get('configuration', [])
+								}
+							)
+							
+							if created:
+								logger.info(f"Auto-created wallet {wallet.wallet_id} for customer {customer_profile.customer_id} after manual ratification")
+								
+								# Send wallet creation success notification
+								send_mail(
+									subject="Wallet Auto-Created After Manual Ratification",
+									message=f"Wallet {wallet.wallet_id} has been automatically created for customer {customer_profile.customer_id} ({customer_profile.user.get_full_name()}) following manual KYC approval.",
+									from_email=settings.DEFAULT_FROM_EMAIL,
+									recipient_list=settings.DEFAULT_EMAIL_RECEIVERS,
+									fail_silently=False,
+								)
+							else:
+								logger.info(f"Updated existing wallet {wallet.wallet_id} for customer {customer_profile.customer_id}")
+								
+						except Exception as wallet_error:
+							logger.error(f"Failed to auto-create wallet for customer {customer_profile.customer_id}: {wallet_error}")
+							
+							# Send wallet creation failure notification
+							send_mail(
+								subject="Wallet Auto-Creation Failed After Manual Ratification",
+								message=f"Failed to auto-create wallet for customer {customer_profile.customer_id} ({customer_profile.user.get_full_name()}) after manual KYC approval. Error: {str(wallet_error)}",
+								from_email=settings.DEFAULT_FROM_EMAIL,
+								recipient_list=settings.DEFAULT_EMAIL_RECEIVERS,
+								fail_silently=False,
+							)
+					else:
+						logger.info(f"Customer {customer_profile.customer_id} already has an active wallet: {existing_wallet.wallet_id}")
+						
+				except Exception as e:
+					logger.error(f"Error during wallet auto-creation process for customer {customer_profile.customer_id}: {e}")
+			
+			elif customer_profile.kyc_status == 'FAILED':
+				# Send failure notification
+				send_mail(
+					subject="Manual KYC Ratification Failed - Customer Requires Further Review",
+					message=f"Customer {customer_profile.customer_id} ({customer_profile.user.get_full_name()}) has failed manual KYC ratification by {instigator_identity}. Error: {customer_profile.kyc_error_message}",
+					from_email=settings.DEFAULT_FROM_EMAIL,
+					recipient_list=settings.DEFAULT_EMAIL_RECEIVERS,
+					fail_silently=False,
+				)
+			
+			return Response({
+				"message": "Manual ratification webhook processed successfully",
+				"customer_id": customer_profile.customer_id,
+				"kyc_status": customer_profile.kyc_status,
+				"manual_ratify_passed": manual_ratify_passed
+			}, status=status.HTTP_200_OK)
+		
+		except Exception as e:
+			logger.error(f"Error processing manual ratification webhook: {e}")
+			return Response({"error": "An unexpected error occurred"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

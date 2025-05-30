@@ -5,6 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status, generics
 from django.db import transaction as db_transaction
+from rest_framework.exceptions import ValidationError
 
 from ..models import BankBeneficiary
 from ..serializers import (
@@ -52,9 +53,23 @@ class BankBeneficiaryDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
         return BankBeneficiary.objects.filter(user=self.request.user)
     
     def perform_destroy(self, instance):
-        # Soft delete - just deactivate the beneficiary
-        instance.is_active = False
-        instance.save()
+        # Check if user wants permanent deletion
+        permanent_delete = self.request.query_params.get('permanent', 'false').lower() == 'true'
+        
+        if permanent_delete:
+            # Check if beneficiary has any transactions
+            if instance.transactions.exists():
+                # Cannot permanently delete if there are linked transactions
+                raise ValidationError({
+                    "error": "Cannot permanently delete beneficiary with existing transactions. Use soft delete instead."
+                })
+            else:
+                # Permanent delete if no transactions
+                instance.delete()
+        else:
+            # Soft delete - just deactivate the beneficiary (default behavior)
+            instance.is_active = False
+            instance.save()
 
 
 class RecentBankBeneficiariesAPIView(generics.ListAPIView):

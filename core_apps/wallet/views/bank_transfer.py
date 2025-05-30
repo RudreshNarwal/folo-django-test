@@ -208,8 +208,12 @@ class BankTransferWebhookAPIView(APIView):
             # Store the complete webhook response data
             transaction.webhook_response = data
             
+            # Store old status for event emission
+            old_status = transaction.status
+            
             # Update transaction status
             transaction.status = 'SUCCESSFUL' if status_value == 'SUCCESSFUL' else 'FAILED'
+            new_status = transaction.status
             
             # Update other fields from webhook
             if data.get('withdrawalId'):
@@ -240,6 +244,10 @@ class BankTransferWebhookAPIView(APIView):
                 wallet.current_balance = wallet_details['currentBalance']
                 wallet.save()
                 
+            # Emit transaction status change event if status changed
+            if old_status != new_status:
+                self._emit_transaction_event(transaction, old_status, new_status)
+                
             return Response({"message": "Webhook processed successfully"}, status=status.HTTP_200_OK)
         
         except Transaction.DoesNotExist:
@@ -249,6 +257,11 @@ class BankTransferWebhookAPIView(APIView):
         except Exception as e:
             logger.error(f"Error processing bank transfer webhook: {e}")
             return Response({"error": "An unexpected error occurred"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def _emit_transaction_event(self, transaction, old_status, new_status):
+        """Helper method to emit a transaction status change event."""
+        logger.info(f"Bank transfer {transaction.transaction_id} status changed from {old_status} to {new_status}")
+        # Add your event emission logic here (WebSocket, Push notification, etc.)
 
 
 class GetBankTransferFeeAPIView(APIView):

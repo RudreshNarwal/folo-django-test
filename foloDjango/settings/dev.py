@@ -236,8 +236,8 @@ CORS_ALLOW_ALL_ORIGINS = True  # set false for prod TODO
 CORS_ALLOW_CREDENTIALS = True  # set false for prod TODO
 ADMIN_URL = env("DJANGO_ADMIN_URL")
 DATABASES = {"default": env.db("DATABASE_URL")}
-SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")  # comment this to run in local
-SECURE_SSL_REDIRECT = env.bool("DJANGO_SECURE_SSL_REDIRECT", default=True)  # comment this to run in local
+# SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")  # comment this to run in local
+# SECURE_SSL_REDIRECT = env.bool("DJANGO_SECURE_SSL_REDIRECT", default=True)  # comment this to run in local
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 

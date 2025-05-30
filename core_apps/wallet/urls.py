@@ -20,7 +20,9 @@ from .views.transaction import (
     # New contact-related views
     RecentContactsAPIView,
     CheckContactWalletAPIView,
-    ContactTransactionHistoryAPIView # Contact-specific history
+    ContactTransactionHistoryAPIView, # Contact-specific history
+    # Transaction status view
+    TransactionStatusAPIView
 )
 # Import from views/mpin.py
 from .views.mpin import UpdateWalletMpinAPIView
@@ -66,6 +68,9 @@ urlpatterns = [
     # Complete wallet history endpoint
     path('history/', ComprehensiveWalletHistoryAPIView.as_view(), name='comprehensive-wallet-history'),
     path('history/summary/', WalletTransactionSummaryAPIView.as_view(), name='wallet-transaction-summary'),
+
+    # Transaction Status Endpoint
+    path('transactions/<str:transaction_id>/status/', TransactionStatusAPIView.as_view(), name='transaction-status'),
 
     # Contact Management & History Endpoints
     path('contacts/recent/', RecentContactsAPIView.as_view(), name='recent-contacts'),

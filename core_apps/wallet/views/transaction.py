@@ -259,6 +259,9 @@ class WalletToMpesaTransferAPIView(APIView):
                 if response.get('status') == 'PENDING':
                     status_message = "MPESA withdrawal is being processed"
 
+                # Emit transaction status change event (for real-time updates)
+                self._emit_transaction_event(transaction, 'PENDING', response.get('status'))
+                
                 return Response({
                     "message": status_message,
                     "transaction_id": str(transaction.transaction_id),
@@ -347,6 +350,10 @@ class MpesaWithdrawalWebhookAPIView(APIView):
             # Update transaction status
             transaction.status = 'SUCCESSFUL' if status_value == 'SUCCESSFUL' else 'FAILED'
             
+            # Store old status for potential event emission
+            old_status = 'PENDING'  # Webhooks typically come for pending transactions
+            new_status = transaction.status
+            
             # Handle payment_id if present (new format)
             if payment_id:
                 transaction.external_reference_id = str(payment_id)
@@ -396,6 +403,9 @@ class MpesaWithdrawalWebhookAPIView(APIView):
                 wallet.available_balance = wallet_details['availableBalance']
                 wallet.current_balance = wallet_details['currentBalance']
                 wallet.save()
+                
+            # Emit transaction status change event (for real-time updates)
+            self._emit_transaction_event(transaction, old_status, new_status)
                 
             return Response({"message": "Webhook processed successfully"}, status=status.HTTP_200_OK)
         
@@ -782,3 +792,212 @@ class WalletTransactionSummaryAPIView(APIView):
         }
         
         return Response(summary, status=status.HTTP_200_OK)
+
+
+class TransactionStatusAPIView(APIView):
+    """
+    API view to get current status of any transaction (Transfer or TopUp).
+    Supports both transaction_id (UUID) and payment_id (integer).
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request, transaction_id):
+        try:
+            user = request.user
+            refresh_from_gateway = request.query_params.get('refresh', 'false').lower() == 'true'
+            
+            # Try to find transaction by transaction_id (UUID format)
+            transaction = None
+            topup_transaction = None
+            
+            # First try as UUID for regular transactions
+            try:
+                transaction = Transaction.objects.filter(
+                    transaction_id=uuid.UUID(transaction_id),
+                    user=user
+                ).first()
+            except (ValueError, TypeError):
+                # If not valid UUID, try as string/integer for TopUpTransaction
+                pass
+            
+            # If not found as regular transaction, try TopUpTransaction by external_unique_id or payment_id
+            if not transaction:
+                try:
+                    # Try by external_unique_id (UUID)
+                    topup_transaction = TopUpTransaction.objects.filter(
+                        external_unique_id=uuid.UUID(transaction_id),
+                        wallet__user=user
+                    ).first()
+                except (ValueError, TypeError):
+                    # Try by payment_id (integer)
+                    try:
+                        payment_id = int(transaction_id)
+                        topup_transaction = TopUpTransaction.objects.filter(
+                            payment_id=payment_id,
+                            wallet__user=user
+                        ).first()
+                    except (ValueError, TypeError):
+                        pass
+            
+            # If still not found, return error
+            if not transaction and not topup_transaction:
+                return Response({
+                    "status": "error",
+                    "message": "Transaction not found",
+                    "code": "TRANSACTION_NOT_FOUND"
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Handle regular Transaction
+            if transaction:
+                # Optionally refresh status from gateway
+                if refresh_from_gateway and transaction.status == 'PENDING':
+                    self._refresh_transaction_status(transaction)
+                
+                serializer = TransactionSerializer(transaction, context={'request': request})
+                return Response({
+                    "status": "success",
+                    "transaction_type": "wallet_transaction",
+                    "data": {
+                        "transaction_id": str(transaction.transaction_id),
+                        "external_unique_id": str(transaction.external_unique_id),
+                        "type": transaction.transaction_type,
+                        "amount": str(transaction.amount),
+                        "fee": str(transaction.fee),
+                        "currency": transaction.currency,
+                        "status": transaction.status,
+                        "description": transaction.description,
+                        "created_at": transaction.created_at,
+                        "updated_at": transaction.updated_at,
+                        "from_wallet_id": str(transaction.from_wallet.wallet_id) if transaction.from_wallet else None,
+                        "to_wallet_id": str(transaction.to_wallet.wallet_id) if transaction.to_wallet else None,
+                        "deliver_to_phone": transaction.deliver_to_phone,
+                        "reference": transaction.reference,
+                        "withdrawal_id": transaction.withdrawal_id,
+                        "gateway_transaction_id": transaction.gateway_transaction_id,
+                        "gateway": transaction.gateway,
+                        "contact_info": {
+                            "name": transaction.contact.name if transaction.contact else None,
+                            "phone": transaction.contact.phone_number if transaction.contact else None
+                        } if transaction.contact else None,
+                        "bank_beneficiary_info": {
+                            "account_holder_name": transaction.bank_beneficiary.account_holder_name,
+                            "account_number": transaction.bank_beneficiary.account_number,
+                            "bank_name": transaction.bank_beneficiary.bank_name,
+                            "nickname": transaction.bank_beneficiary.nickname
+                        } if transaction.bank_beneficiary else None,
+                        "error_info": transaction.extra_info.get('error_description') if transaction.extra_info else None
+                    }
+                }, status=status.HTTP_200_OK)
+            
+            # Handle TopUpTransaction
+            elif topup_transaction:
+                # Optionally refresh status from gateway
+                if refresh_from_gateway and topup_transaction.status == 'PENDING':
+                    self._refresh_topup_status(topup_transaction)
+                
+                return Response({
+                    "status": "success",
+                    "transaction_type": "topup_transaction",
+                    "data": {
+                        "transaction_id": str(topup_transaction.external_unique_id),
+                        "payment_id": topup_transaction.payment_id,
+                        "type": "TOPUP",
+                        "amount": str(topup_transaction.amount),
+                        "fee": str(topup_transaction.fee),
+                        "currency": topup_transaction.currency,
+                        "status": topup_transaction.status,
+                        "description": topup_transaction.description,
+                        "created_at": topup_transaction.created_at,
+                        "updated_at": topup_transaction.updated_at,
+                        "wallet_id": str(topup_transaction.wallet.wallet_id),
+                        "payment_type": topup_transaction.payment_type,
+                        "merchant_name": topup_transaction.merchant_name,
+                        "gateway_transaction_id": topup_transaction.gateway_transaction_id,
+                        "gateway": topup_transaction.gateway,
+                        "payment_reference": topup_transaction.payment_reference,
+                        "error_description": topup_transaction.error_description
+                    }
+                }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error retrieving transaction status for {transaction_id}: {e}")
+            return Response({
+                "status": "error",
+                "message": "An error occurred while retrieving transaction status",
+                "code": "INTERNAL_ERROR"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    def _refresh_transaction_status(self, transaction):
+        """Helper method to refresh transaction status from DTB gateway."""
+        try:
+            dtb_service = DTBService()
+            
+            if transaction.transaction_type == 'WALLET_TO_MPESA' and transaction.withdrawal_id:
+                # Check MPESA withdrawal status
+                status_response = dtb_service.get_withdrawal_status(
+                    transaction.from_wallet.wallet_id, 
+                    transaction.withdrawal_id
+                )
+                
+                # Update transaction based on response
+                new_status = status_response.get('status', transaction.status)
+                if new_status != transaction.status:
+                    transaction.status = new_status
+                    if status_response.get('errorDescription'):
+                        if not transaction.extra_info:
+                            transaction.extra_info = {}
+                        transaction.extra_info['error_description'] = status_response.get('errorDescription')
+                    transaction.save()
+                    logger.info(f"Updated transaction {transaction.transaction_id} status from gateway: {new_status}")
+            
+            elif transaction.transaction_type in ['WALLET_TO_BANK', 'WALLET_TO_PESALINK']:
+                # For bank transfers, we can update wallet balance to see if transaction reflected
+                wallet_details = dtb_service.get_wallet_details(transaction.from_wallet.wallet_id)
+                wallet = transaction.from_wallet
+                wallet.available_balance = wallet_details['availableBalance']
+                wallet.current_balance = wallet_details['currentBalance']
+                wallet.save()
+                
+        except Exception as e:
+            logger.error(f"Error refreshing transaction status from gateway: {e}")
+    
+    def _refresh_topup_status(self, topup_transaction):
+        """Helper method to refresh topup transaction status from DTB gateway."""
+        try:
+            dtb_service = DTBService()
+            status_response = dtb_service.get_top_up_status(
+                topup_transaction.wallet.wallet_id, 
+                topup_transaction.payment_id
+            )
+            
+            # Update transaction status
+            new_status = status_response.get('status', topup_transaction.status)
+            if new_status != topup_transaction.status:
+                topup_transaction.status = new_status
+                
+                if new_status == 'ERROR_PERM':
+                    topup_transaction.error_description = status_response.get('description', '')
+                
+                topup_transaction.gateway = status_response.get('gateway', '')
+                topup_transaction.gateway_transaction_id = status_response.get('gatewayTransactionId', '')
+                topup_transaction.save()
+                
+                logger.info(f"Updated topup transaction {topup_transaction.payment_id} status from gateway: {new_status}")
+                
+                # If successful, update wallet balance
+                if new_status == 'SUCCESSFUL':
+                    wallet = topup_transaction.wallet
+                    wallet_details = dtb_service.get_wallet_details(wallet.wallet_id)
+                    wallet.available_balance = wallet_details['availableBalance']
+                    wallet.current_balance = wallet_details['currentBalance']
+                    wallet.save()
+                    
+        except Exception as e:
+            logger.error(f"Error refreshing topup status from gateway: {e}")
+
+    def _emit_transaction_event(self, transaction, old_status, new_status):
+        """Helper method to emit a transaction status change event."""
+        # Implementation of emitting a transaction status change event
+        # This is a placeholder and should be replaced with the actual implementation
+        # based on your event system or notification service
+        logger.info(f"Transaction {transaction.transaction_id} status changed from {old_status} to {new_status}")

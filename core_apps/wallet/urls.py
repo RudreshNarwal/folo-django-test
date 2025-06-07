@@ -8,6 +8,7 @@ from .views import (
     TopUpMoneyAPIView, TopUpWebhookAPIView, WalletMovementCallbackAPIView,
     ManualRatificationWebhookAPIView
 )
+from .views.bridge import RequestTOSLinkAPI, CreateCustomerAPI, InitiateTransferAPI
 # Import from views/transaction.py (new file)
 from .views.transaction import (
     WalletToWalletTransferAPIView,
@@ -89,4 +90,8 @@ urlpatterns = [
     # Webhook endpoints
     path('movement/callback/', WalletMovementCallbackAPIView.as_view(), name='wallet-movement-callback'),
     path('kyc/manual-ratification/webhook/', ManualRatificationWebhookAPIView.as_view(), name='manual-ratification-webhook'),
+    path('request-tos-link/', RequestTOSLinkAPI.as_view(), name='request_tos_link_api'),
+    path('create-customer/', CreateCustomerAPI.as_view(), name='create_customer_api'),
+    path('initiate-transfer/', InitiateTransferAPI.as_view(), name='initiate_transfer_api'),
+
 ]

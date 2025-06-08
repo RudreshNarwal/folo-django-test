@@ -166,10 +166,10 @@ class UploadDocumentAPIView(generics.CreateAPIView):
 			}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-## Not in use right now for future use only. We are using UserSerializer partial_update
+# Not in use right now for future use only. We are using UserSerializer partial_update
 class SaveAddressAPIView(generics.UpdateAPIView):
 	"""
-	On Boarding Step 4: Provide Address
+	Onboarding Step 4: Provide Address
 	"""
 	serializer_class = AddressSerializer
 	permission_classes = [IsAuthenticated]

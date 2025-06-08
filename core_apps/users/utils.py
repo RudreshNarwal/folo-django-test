@@ -50,7 +50,8 @@ def get_base64_from_s3(s3_key):
     except Exception as e:
         logger.error(f"Error reading from S3: {e}")
         raise
-    
+
+
 def get_public_url(s3_key):
     bucket_name = settings.AWS_STORAGE_BUCKET_NAME
     region_name = settings.AWS_S3_REGION_NAME

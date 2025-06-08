@@ -1,1 +1,2 @@
-from api_logging_service import APILoggingService
+from core_apps.common.services.api_logging_service import APILoggingService
+from core_apps.common.services.image_conversion_services import get_image_data_uri_from_signed_url

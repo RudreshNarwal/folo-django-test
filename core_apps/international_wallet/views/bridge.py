@@ -1,7 +1,6 @@
-# bridge_integration/views.py
 from django.http import JsonResponse
-from django.conf import settings
 import logging
+from urllib.parse import urlparse, parse_qs
 
 # DRF imports
 from rest_framework.views import APIView
@@ -10,20 +9,14 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 
 # Import the services and serializers
-from core_apps.wallet.services.bridge_services import BridgeAPIService, BridgeAPIError
-from core_apps.common.services.api_logging_service import APILoggingService
-from core_apps.wallet.serializers import (
+from core_apps.international_wallet.services.bridge_services import BridgeAPIService, BridgeAPIError
+from core_apps.international_wallet.serializers import (
     CreateCustomerSerializer,
     InitiateTransferSerializer
 )
 import requests # Import requests directly for generic RequestException handling
 
 logger = logging.getLogger(__name__)
-
-# Initialize the API Logging Service once
-api_logging_service = APILoggingService()
-# Initialize the Bridge API service
-bridge_service = BridgeAPIService()
 
 
 # Helper function for consistent JSON error responses (can be reused if needed outside APIView)
@@ -51,20 +44,32 @@ class RequestTOSLinkAPI(APIView):
         """
         Handles POST requests to get a TOS link.
         """
+        # Initialize the Bridge API service
+        bridge_service = BridgeAPIService()
+
         if not bridge_service:
             return Response({"error": {"message": "API Service not initialized.", "code": 500}}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         try:
             response_data = bridge_service.request_terms_of_service_link()
             # Save the signed agreement ID to the user model for future reference
-            request.user.signed_agreement_id = response_data.get("signed_agreement_id")
-            request.user.save(update_fields=["signed_agreement_id"])
+            if response_data and response_data.get("url", None):
+                # Parse the URL
+                parsed_url = urlparse(response_data["url"])
+
+                # Extract the query parameters
+                query_params = parse_qs(parsed_url.query)
+
+                # Get the session_token
+                signed_agreement_id = query_params.get('session_token', [None])[0]
+                request.user.bridge_signed_agreement_id = signed_agreement_id
+                request.user.save(update_fields=["bridge_signed_agreement_id"])
 
             return Response(response_data, status=status.HTTP_200_OK)
         except BridgeAPIError as e:
-            logger.error(f"Error requesting TOS link from Bridge API: {e.message}", exc_info=True)
+            logger.error(f"Error requesting TOS link from Bridge API: {str(e)}", exc_info=True)
             return Response(
-                {"error": {"message": e.message, "code": e.status_code, "details": e.response_data}},
+                {"error": {"message": str(e), "code": e.status_code, "details": e.response_data}},
                 status=e.status_code
             )
         except requests.exceptions.RequestException as e:
@@ -80,6 +85,7 @@ class RequestTOSLinkAPI(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+
 class CreateCustomerAPI(APIView):
     """
     API endpoint to create a new customer in the Bridge system.
@@ -94,10 +100,7 @@ class CreateCustomerAPI(APIView):
         """
         Handles POST requests to create a customer.
         """
-        if not bridge_service:
-            return Response({"error": {"message": "API Service not initialized.", "code": 500}}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        serializer = CreateCustomerSerializer(data=request.data)
+        serializer = CreateCustomerSerializer(data=request.data, context={"request": self.request})
         if not serializer.is_valid():
             logger.warning(f"Invalid request data for customer creation: {serializer.errors}")
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -105,12 +108,18 @@ class CreateCustomerAPI(APIView):
         customer_data = serializer.validated_data
 
         try:
+            # Initialize the Bridge API service
+            bridge_service = BridgeAPIService()
+            if not bridge_service:
+                return Response({"error": {"message": "API Service not initialized.", "code": 500}},
+                                status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
             response_data = bridge_service.create_customer(customer_data)
             return Response(response_data, status=status.HTTP_200_OK) # Bridge API usually returns 200 OK
         except BridgeAPIError as e:
-            logger.error(f"Error creating customer via Bridge API: {e.message}", exc_info=True)
+            logger.error(f"Error creating customer via Bridge API: {str(e)}", exc_info=True)
             return Response(
-                {"error": {"message": e.message, "code": e.status_code, "details": e.response_data}},
+                {"error": {"message": str(e), "code": e.status_code, "details": e.response_data}},
                 status=e.status_code
             )
         except requests.exceptions.RequestException as e:
@@ -126,6 +135,7 @@ class CreateCustomerAPI(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+
 class InitiateTransferAPI(APIView):
     """
     API endpoint to initiate a money transfer through the Bridge API.
@@ -140,10 +150,7 @@ class InitiateTransferAPI(APIView):
         """
         Handles POST requests to initiate a transfer.
         """
-        if not bridge_service:
-            return Response({"error": {"message": "API Service not initialized.", "code": 500}}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        serializer = InitiateTransferSerializer(data=request.data)
+        serializer = InitiateTransferSerializer(data=request.data, context={"request": self.request})
         if not serializer.is_valid():
             logger.warning(f"Invalid request data for transfer initiation: {serializer.errors}")
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -151,12 +158,18 @@ class InitiateTransferAPI(APIView):
         transfer_data = serializer.validated_data
 
         try:
+            # Initialize the Bridge API service
+            bridge_service = BridgeAPIService()
+            if not bridge_service:
+                return Response({"error": {"message": "API Service not initialized.", "code": 500}},
+                                status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
             response_data = bridge_service.initiate_transfer(transfer_data)
             return Response(response_data, status=status.HTTP_200_OK) # Bridge API usually returns 200 OK
         except BridgeAPIError as e:
-            logger.error(f"Error initiating transfer via Bridge API: {e.message}", exc_info=True)
+            logger.error(f"Error initiating transfer via Bridge API: {str(e)}", exc_info=True)
             return Response(
-                {"error": {"message": e.message, "code": e.status_code, "details": e.response_data}},
+                {"error": {"message": str(e), "code": e.status_code, "details": e.response_data}},
                 status=e.status_code
             )
         except requests.exceptions.RequestException as e:

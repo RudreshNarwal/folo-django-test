@@ -11,11 +11,11 @@ import base64
 from django.core.files.base import ContentFile
 
 
-
 class DocumentSerializer(serializers.ModelSerializer):
     base64_encoded_document = serializers.CharField(write_only=True, required=True)
     signed_s3_url = serializers.SerializerMethodField(read_only=True)
     media_type = serializers.CharField(read_only=True)  # Make media_type read-only
+
     class Meta:
         model = Document
         fields = ['id', 'document_type', 'media_type', 'signed_s3_url', 'base64_encoded_document']
@@ -75,73 +75,74 @@ class DocumentSerializer(serializers.ModelSerializer):
         
         # Update or create the Document instance
         document, created = Document.objects.update_or_create(
-	        user=user,
-	        document_type=validated_data['document_type'],
-	        defaults={
-		        's3_key': s3_key,
-		        'media_type': media_type,
-	        }
+            user=user,
+            document_type=validated_data['document_type'],
+            defaults={
+                's3_key': s3_key,
+                'media_type': media_type,
+            }
         )
         return document
 
+
 class AddressSerializer(serializers.ModelSerializer):
-	class Meta:
-		model = Address
-		fields = [
-			'address_type', 'city', 'country',
-			'line1', 'line2', 'state', 'code'
-		]
+    class Meta:
+        model = Address
+        fields = [
+            'address_type', 'city', 'country',
+            'line1', 'line2', 'state', 'code'
+        ]
 
 
 class UserSerializer(serializers.ModelSerializer):
-	mobile = serializers.CharField(required=True, max_length=15, min_length=5)
-	country_code = serializers.CharField(max_length=5, allow_blank=True, required=False)
-	nation_id = serializers.CharField(required=True, max_length=20)
-	first_name = serializers.CharField(required=True, max_length=128)
-	middle_name = serializers.CharField(required=False, max_length=128, allow_null=True, allow_blank=True)
-	last_name = serializers.CharField(required=False, max_length=128, allow_null=True, allow_blank=True)
-	email = serializers.EmailField(required=True)
-	dob = serializers.DateField(required=True)
-	
-	documents = DocumentSerializer(many=True, read_only=True)
-	address = AddressSerializer(read_only=True)
-	
-	class Meta:
-		model = User
-		fields = [
-			'pkid', 'id', 'first_name', 'middle_name', 'last_name', "dob", "mobile", 'is_mobile_verified', 'email', "gender", "nation_id",
-			"is_email_verified", "country_code", "marital_status", "country", "city", "title", "documents", "address", "district_of_birth"
-		]
-	
-	def validate_mobile(self, value):
-		# Default country code
-		default_country_code = '+254'
-		# Possible country code prefixes
-		country_code_prefixes = ['+254', '+91', '+1', '+234', '+27', '+20']  # Add more as needed
-		
-		# Initialize variables
-		country_code = default_country_code
-		mobile_number = value
-		
-		# Detect and extract the country code if present
-		for prefix in country_code_prefixes:
-			if value.startswith(prefix):
-				country_code = prefix
-				mobile_number = value[len(prefix):]
-				break
-		# Update the internal representation with separated country code and mobile number
-		self.initial_data.update({
-			'country_code': country_code,
-			'mobile': mobile_number
-		})
-		
-		return mobile_number
-	
-	def to_representation(self, instance):
-		"""
-		Customize the representation to include documents and address.
-		"""
-		representation = super().to_representation(instance)
-		representation['documents'] = DocumentSerializer(instance.documents.all(), many=True, context=self.context).data
-		representation['address'] = AddressSerializer(instance.address, context=self.context).data if hasattr(instance, 'address') else None
-		return representation
+    mobile = serializers.CharField(required=True, max_length=15, min_length=5)
+    country_code = serializers.CharField(max_length=5, allow_blank=True, allow_null=True, required=False)
+    nation_id = serializers.CharField(required=True, max_length=20)
+    first_name = serializers.CharField(required=True, max_length=128)
+    middle_name = serializers.CharField(required=False, max_length=128, allow_null=True, allow_blank=True)
+    last_name = serializers.CharField(required=False, max_length=128, allow_null=True, allow_blank=True)
+    email = serializers.EmailField(required=True)
+    dob = serializers.DateField(required=True)
+    documents = DocumentSerializer(many=True, read_only=True)
+    address = AddressSerializer(read_only=True)
+
+    class Meta:
+        model = User
+        fields = [
+            "pkid", "id", "first_name", "middle_name", "last_name", "dob", "mobile", 'is_mobile_verified', "email",
+            "gender", "nation_id", "is_email_verified", "country_code", "marital_status", "country", "city", "title",
+            "documents", "address", "district_of_birth", "bridge_signed_agreement_id"
+        ]
+
+    def validate_mobile(self, value):
+        # Default country code
+        default_country_code = '+254'
+        # Possible country code prefixes
+        country_code_prefixes = ['+254', '+91', '+1', '+234', '+27', '+20']  # Add more as needed
+
+        # Initialize variables
+        country_code = default_country_code
+        mobile_number = value
+
+        # Detect and extract the country code if present
+        for prefix in country_code_prefixes:
+            if value.startswith(prefix):
+                country_code = prefix
+                mobile_number = value[len(prefix):]
+                break
+        # Update the internal representation with separated country code and mobile number
+        self.initial_data.update({
+            'country_code': country_code,
+            'mobile': mobile_number
+        })
+
+        return mobile_number
+
+    def to_representation(self, instance):
+        """
+        Customize the representation to include documents and address.
+        """
+        representation = super().to_representation(instance)
+        representation['documents'] = DocumentSerializer(instance.documents.all(), many=True, context=self.context).data
+        representation['address'] = AddressSerializer(instance.address, context=self.context).data if hasattr(instance, 'address') else None
+        return representation

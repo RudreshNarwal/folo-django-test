@@ -77,15 +77,16 @@ class CreateCustomerSerializer(serializers.Serializer):
         data["residential_address"] = ResidentialAddressSerializer(address).data
         data["birth_date"] = dob.strftime("%Y-%m-%d")
         data["signed_agreement_id"] = bridge_signed_agreement_id
+        country_name = get_country_name_from_code(user_country_code)
         data["identifying_information"] = [
             {
                 "type": "ssn",
-                "issuing_country": get_country_name_from_code(user_country_code),
+                "issuing_country": country_name,
                 "number": ssn.document_number
             },
             {
                 "type": "drivers_license",
-                "issuing_country": get_country_name_from_code(user_country_code),
+                "issuing_country": country_name,
                 "number": dl_front.document_number,
                 "image_front": get_image_data_uri_from_signed_url(generate_presigned_url(dl_front.s3_key)),
                 "image_back": get_image_data_uri_from_signed_url(generate_presigned_url(dl_back.s3_key))

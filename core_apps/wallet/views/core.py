@@ -24,6 +24,7 @@ from ..services.dtb_services import (
 	DTBServiceAPIError,
 )
 from core_apps.users.utils import get_base64_from_s3
+from ..services.wallet_service import create_wallet_for_customer, WalletCreationError
 
 logger = logging.getLogger(__name__)
 
@@ -300,8 +301,8 @@ class FinalizeRegistrationAPIView(APIView):
 
 class CreateCustomerWalletAPIView(APIView):
 	"""
-	Create Customer Wallet: Automatically selects an allowed wallet type,
-	creates the wallet via DTB API, and updates the local database.
+	Create Customer Wallet: Creates a wallet for an approved customer.
+	This can be called manually if the automatic process fails.
 	"""
 	permission_classes = [IsAuthenticated]
 	
@@ -309,7 +310,6 @@ class CreateCustomerWalletAPIView(APIView):
 	def post(self, request):
 		user = request.user
 		
-		# Get the customer's profile
 		try:
 			customer_profile = user.customer_profile
 		except CustomerProfile.DoesNotExist:
@@ -318,141 +318,20 @@ class CreateCustomerWalletAPIView(APIView):
 				"error": "Customer profile is required to create a wallet."
 			}, status=status.HTTP_400_BAD_REQUEST)
 		
-		# Ensure customer_id is present
-		if not customer_profile.customer_id:
-			return Response({
-				"message": "Customer is not registered with DTB.",
-				"error": "Please complete registration and KYC first."
-			}, status=status.HTTP_400_BAD_REQUEST)
-		
-		kyc_service = DTBService()
-		
 		try:
-			# ---------------------------
-			# Fetch Allowed Wallet Types
-			# ---------------------------
-			logger.info("Fetching allowed wallet types from DTB.")
-			wallet_types_response = kyc_service.get_wallet_types()
-			wallet_types = wallet_types_response  # Assuming response is a list of dicts
-			
-			# Sort wallet types by walletTypeId descending to prioritize higher IDs
-			sorted_wallet_types = sorted(wallet_types, key=lambda x: x.get('walletTypeId', 0), reverse=True)
-			
-			# Select the first allowed walletTypeId
-			selected_wallet_type_id = 2497
-			# for wallet_type in sorted_wallet_types:
-			#     if wallet_type.get('allowed', False):
-			#         selected_wallet_type_id = wallet_type.get('walletTypeId')
-			#         logger.info(f"Selected walletTypeId: {selected_wallet_type_id} as it is allowed.")
-			#         break
-			
-			if not selected_wallet_type_id:
-				# No allowed wallet type found
-				error_message = "No allowed wallet type found for the customer."
-				logger.error(error_message)
-				# Trigger an email notification
-				send_mail(
-					subject="Error: Wallet Creation Failed",
-					message=f"Failed to create wallet for customer ID {customer_profile.customer_id} as no allowed wallet type was found.",
-					from_email=settings.DEFAULT_FROM_EMAIL,
-					recipient_list=settings.DEFAULT_EMAIL_RECEIVERS,
-					fail_silently=False,
-				)
-				
-				return Response({
-					"message": "Wallet creation failed.",
-					"error": error_message
-				}, status=status.HTTP_400_BAD_REQUEST)
-			
-			# ---------------------------
-			# Create Wallet JSON Payload
-			# ---------------------------
-			wallet_payload = {
-				"externalUniqueId": str(uuid.uuid4()),
-				"status": "ACTIVE",
-				"name": "Cust DTB Wallet",
-				"description": "Cust DTB Wallet",
-				"walletTypeId": selected_wallet_type_id,
-				"cardType": "virtual",
-				"configuration": []
-			}
-			
-			logger.debug(f"Wallet payload for creation: {wallet_payload}")
-			
-			# ---------------------------
-			# Check for Existing Active Wallet, if not then creating
-			# ---------------------------
-			try:
-				dtb_wallets = kyc_service.get_wallets(customer_profile.customer_id)
-				existing_wallets = [
-					wallet for wallet in dtb_wallets
-					if wallet.get('walletTypeId') == selected_wallet_type_id and wallet.get('status') == 'ACTIVE'
-				]
-			except Exception as e:
-				logger.error("Error while checking for existing wallets: %s", e)
-				existing_wallets = []
-			
-			if existing_wallets:
-				# Use the first matching wallet from DTB
-				wallet_response = existing_wallets[0]
-			else:
-				# Create a new wallet via DTB API
-				wallet_response = kyc_service.create_wallet(customer_profile.customer_id, wallet_payload)
-			
-			# ---------------------------
-			# Update Database
-			# ---------------------------
-			# Get or create the WalletType
-			wallet_type_id = wallet_response.get('walletTypeId')
-			try:
-				wallet_type = WalletType.objects.get(wallet_type_id=wallet_type_id)
-			except WalletType.DoesNotExist:
-				# Optionally, handle the case where WalletType does not exist locally
-				return Response({
-					"message": "Invalid wallet type returned from DTB.",
-					"error": f"WalletType with ID {wallet_type_id} does not exist locally."
-				}, status=status.HTTP_400_BAD_REQUEST)
-			
-			# Update or create the local Wallet record
-			wallet, created = Wallet.objects.update_or_create(
-				wallet_id=wallet_response.get('walletId'),
-				defaults={
-					'user': user,
-					'external_unique_id': uuid.UUID(wallet_response.get('externalUniqueId')),
-					'wallet_type': wallet_type,
-					'name': wallet_response.get('name'),
-					'description': wallet_response.get('description'),
-					'card_type': wallet_response.get('cardType') or CardType.VIRTUAL,
-					'status': wallet_response.get('status'),
-					'currency': wallet_response.get('currency'),
-					'available_balance': wallet_response.get('availableBalance'),
-					'current_balance': wallet_response.get('currentBalance'),
-					'reservations': wallet_response.get('reservations'),
-					'account_number': wallet_response.get('accountNumber'),
-					'friendly_id': wallet_response.get('friendlyId'),
-					'customer': customer_profile,
-					'organisation_id': wallet_response.get('organisationId'),
-					'configuration': wallet_response.get('configuration')
-				}
-			)
-			logger.info(f"Wallet {wallet.id} created locally for user {user.id}.")
-			
-			# Serialize the wallet data for response
+			wallet = create_wallet_for_customer(customer_profile)
 			response_serializer = WalletResponseSerializer(wallet)
-			
 			return Response({
-				"message": "Wallet created successfully." if created else "Existing wallet used.",
+				"message": "Wallet created or already exists.",
 				"wallet": response_serializer.data
 			}, status=status.HTTP_201_CREATED)
-		
-		except (DTBServiceAuthenticationError, DTBServiceAPIError, DTBServiceError) as e:
-			return handle_provider_exception(customer_profile, 'Create Wallet', e)
-		except Exception as e:
-			logger.error(f"Unexpected error during wallet creation: {e}")
+
+		except WalletCreationError as e:
+			logger.error(f"Manual wallet creation failed for user {user.id}: {e}")
 			return Response({
 				"message": "Wallet creation failed.",
 				"error": str(e)
-			}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+			}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class TopUpMoneyAPIView(APIView):
@@ -1094,115 +973,20 @@ class ManualRatificationWebhookAPIView(APIView):
 					fail_silently=False,
 				)
 				
-				# Auto-create wallet if customer doesn't have one
+				# Auto-create wallet
 				try:
-					existing_wallet = Wallet.objects.filter(user=customer_profile.user, status='ACTIVE').first()
-					if not existing_wallet:
-						logger.info(f"Attempting to auto-create wallet for manually ratified customer {customer_profile.customer_id}")
-						
-						# Auto-create wallet using the same logic as CreateCustomerWalletAPIView
-						dtb_service = DTBService()
-						
-						try:
-							# Fetch allowed wallet types
-							wallet_types_response = dtb_service.get_wallet_types()
-							wallet_types = wallet_types_response
-							
-							# Select wallet type (using the same logic as CreateCustomerWalletAPIView)
-							selected_wallet_type_id = 2497  # Default wallet type
-							
-							# Create wallet payload
-							wallet_payload = {
-								"externalUniqueId": str(uuid.uuid4()),
-								"status": "ACTIVE",
-								"name": "Cust DTB Wallet",
-								"description": "Auto-created wallet after manual ratification",
-								"walletTypeId": selected_wallet_type_id,
-								"cardType": "virtual",
-								"configuration": []
-							}
-							
-							# Check for existing wallets first
-							try:
-								dtb_wallets = dtb_service.get_wallets(customer_profile.customer_id)
-								existing_wallets = [
-									wallet for wallet in dtb_wallets
-									if wallet.get('walletTypeId') == selected_wallet_type_id and wallet.get('status') == 'ACTIVE'
-								]
-							except Exception as e:
-								logger.error("Error while checking for existing wallets: %s", e)
-								existing_wallets = []
-							
-							if existing_wallets:
-								# Use the first matching wallet from DTB
-								wallet_response = existing_wallets[0]
-								logger.info(f"Found existing DTB wallet for customer {customer_profile.customer_id}")
-							else:
-								# Create a new wallet via DTB API
-								wallet_response = dtb_service.create_wallet(customer_profile.customer_id, wallet_payload)
-								logger.info(f"Created new DTB wallet for customer {customer_profile.customer_id}")
-							
-							# Get or create the WalletType
-							wallet_type_id = wallet_response.get('walletTypeId')
-							try:
-								wallet_type = WalletType.objects.get(wallet_type_id=wallet_type_id)
-							except WalletType.DoesNotExist:
-								logger.error(f"WalletType with ID {wallet_type_id} does not exist locally")
-								raise Exception(f"WalletType with ID {wallet_type_id} does not exist locally")
-							
-							# Create or update the local Wallet record
-							wallet, created = Wallet.objects.update_or_create(
-								wallet_id=wallet_response.get('walletId'),
-								defaults={
-									'user': customer_profile.user,
-									'customer': customer_profile,
-									'wallet_type': wallet_type,
-									'name': wallet_response.get('name'),
-									'description': wallet_response.get('description'),
-									'status': wallet_response.get('status'),
-									'currency': wallet_response.get('currency', 'KES'),
-									'available_balance': wallet_response.get('availableBalance', 0),
-									'current_balance': wallet_response.get('currentBalance', 0),
-									'reservations': wallet_response.get('reservations', 0),
-									'account_number': wallet_response.get('accountNumber'),
-									'external_unique_id': wallet_response.get('externalUniqueId'),
-									'friendly_id': wallet_response.get('friendlyId'),
-									'organisation_id': wallet_response.get('organisationId'),
-									'configuration': wallet_response.get('configuration', [])
-								}
-							)
-							
-							if created:
-								logger.info(f"Auto-created wallet {wallet.wallet_id} for customer {customer_profile.customer_id} after manual ratification")
-								
-								# Send wallet creation success notification
-								send_mail(
-									subject="Wallet Auto-Created After Manual Ratification",
-									message=f"Wallet {wallet.wallet_id} has been automatically created for customer {customer_profile.customer_id} ({customer_profile.user.get_full_name()}) following manual KYC approval.",
-									from_email=settings.DEFAULT_FROM_EMAIL,
-									recipient_list=settings.DEFAULT_EMAIL_RECEIVERS,
-									fail_silently=False,
-								)
-							else:
-								logger.info(f"Updated existing wallet {wallet.wallet_id} for customer {customer_profile.customer_id}")
-								
-						except Exception as wallet_error:
-							logger.error(f"Failed to auto-create wallet for customer {customer_profile.customer_id}: {wallet_error}")
-							
-							# Send wallet creation failure notification
-							send_mail(
-								subject="Wallet Auto-Creation Failed After Manual Ratification",
-								message=f"Failed to auto-create wallet for customer {customer_profile.customer_id} ({customer_profile.user.get_full_name()}) after manual KYC approval. Error: {str(wallet_error)}",
-								from_email=settings.DEFAULT_FROM_EMAIL,
-								recipient_list=settings.DEFAULT_EMAIL_RECEIVERS,
-								fail_silently=False,
-							)
-					else:
-						logger.info(f"Customer {customer_profile.customer_id} already has an active wallet: {existing_wallet.wallet_id}")
-						
-				except Exception as e:
-					logger.error(f"Error during wallet auto-creation process for customer {customer_profile.customer_id}: {e}")
-			
+					logger.info(f"Attempting to auto-create wallet for manually ratified customer {customer_profile.customer_id}")
+					create_wallet_for_customer(customer_profile)
+				except WalletCreationError as e:
+					logger.error(f"Auto-creation of wallet failed after manual ratification for customer {customer_profile.customer_id}: {e}")
+					# Optionally send another email to admins about the failure
+					send_mail(
+						subject="URGENT: Wallet Auto-Creation Failed After Manual Ratification",
+						message=f"Failed to auto-create wallet for customer {customer_profile.customer_id} ({customer_profile.user.get_full_name()}) after manual KYC approval. Error: {str(e)}",
+						from_email=settings.DEFAULT_FROM_EMAIL,
+						recipient_list=settings.DEFAULT_EMAIL_RECEIVERS,
+						fail_silently=False,
+					)
 			elif customer_profile.kyc_status == 'FAILED':
 				# Send failure notification
 				send_mail(

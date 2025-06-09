@@ -1,0 +1,1 @@
+from core_apps.international_wallet.serializers.bridge import CreateCustomerSerializer, InitiateTransferSerializer

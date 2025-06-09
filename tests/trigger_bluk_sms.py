@@ -1,9 +1,11 @@
 import requests
+from django.conf import settings
+
 
 # Function to send SMS
 def send_verification_code(mobile, message):
-    api_url = "https://api.africastalking.com/version1/messaging"
-    api_key = "dfb804d5dfe09d5d1f4bd5da2be97ed3e8d1e357fd64c54a40e918d253c66d92"
+    api_url = f"{settings.AFRICA_TALKING_BASE_URL}/version1/messaging"
+    api_key = settings.AFRICA_TALKING_API_KEY
     username = "folomoney"
     sender_id = "FOLO"
 

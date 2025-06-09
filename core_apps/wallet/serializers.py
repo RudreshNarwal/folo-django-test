@@ -521,6 +521,6 @@ class BankTransferFeeRequestSerializer(serializers.Serializer):
 
 
 class BankTransferFeeResponseSerializer(serializers.Serializer):
-	"""Serializer for bank transfer fee responses."""
-	fee_amount = serializers.DecimalField(max_digits=20, decimal_places=2, source="feeAmount")
-	transfer_type = serializers.CharField()
+    """Serializer for bank transfer fee responses."""
+    fee_amount = serializers.DecimalField(max_digits=20, decimal_places=2, source="feeAmount")
+    transfer_type = serializers.CharField()

@@ -8,6 +8,7 @@ from django_countries.fields import CountryField
 import pytz
 from django.db import models
 
+from core_apps.common.models import Country, State
 from core_apps.users.managers import CustomUserManager
 from generics.utils.models import GenericModel
 from django.contrib.auth.models import BaseUserManager, AbstractBaseUser, PermissionsMixin
@@ -99,10 +100,11 @@ class User(AbstractBaseUser, GenericModel, PermissionsMixin):
 		verbose_name=_("district_of_birth"), max_length=180, blank=True, null=True
 	)
 	mpin = models.CharField(max_length=4, null=True, blank=True)
-	
+	bridge_signed_agreement_id = models.CharField(max_length=255, null=True, blank=True)
+
 	USERNAME_FIELD = "mobile"  # so that mobile field can be used for authentication
-	
-	REQUIRED_FIELDS = ["first_name", "last_name"]
+
+	REQUIRED_FIELDS = ["first_name", "last_name", "email"]
 	
 	objects = CustomUserManager()
 	
@@ -202,13 +204,17 @@ class Document(GenericModel):
 		('NATIONAL_IDENTITY', 'National Identity'),
 		('BACK_OF_NATIONAL_IDENTITY', 'National Identity Back'),
 		('FACIAL_PHOTO', 'Facial Photo'),
+		('SOCIAL_SECURITY_NUMBER', 'Social Security Number'),
+		('DRIVERS_LICENSE', 'Drivers License'),
+		('BACK_OF_DRIVERS_LICENSE', 'Drivers License Back'),
 	]
-	
+
 	user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='documents')
 	document_type = models.CharField(max_length=50, choices=DOCUMENT_TYPE_CHOICES)
 	media_type = models.CharField(max_length=50)
 	s3_key = models.CharField(max_length=255)  # Store S3 object key
-	
+	document_number = models.CharField(max_length=50, null=True, blank=True) # e.g., National ID number, Driver License number
+
 	def __str__(self):
 		return f"Document {self.document_type} for {self.user.mobile}"
 	
@@ -235,6 +241,12 @@ class Address(GenericModel):
 	line2 = models.CharField(max_length=255, blank=True, null=True)
 	state = models.CharField(max_length=100)
 	code = models.CharField(max_length=20)
+	state_master = models.ForeignKey(
+		State, on_delete=models.CASCADE, related_name='addresses', blank=True, null=True
+	)
+	country_master = models.ForeignKey(
+		Country, on_delete=models.CASCADE, related_name='addresses', blank=True, null=True
+	)
 	
 	def __str__(self):
 		return f"Address for {self.user.mobile}"

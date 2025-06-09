@@ -52,6 +52,7 @@ LOCAL_APPS = [
 	"core_apps.transunion",
 	"core_apps.payments",
 	"core_apps.wallet",
+	"core_apps.international_wallet",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -324,3 +325,10 @@ OPENAI_API_KEY = env("OPENAI_API_KEY")
 
 ADD_MONEY_WEBHOOK_URL = env("ADD_MONEY_WEBHOOK_URL")
 REQUESTS_VERIFY_SSL = True
+
+AFRICA_TALKING_BASE_URL = env("AFRICA_TALKING_BASE_URL")
+AFRICA_TALKING_API_KEY = env("AFRICA_TALKING_API_KEY")
+
+BRIDGE_API_KEY = env("BRIDGE_API_KEY")
+BRIDGE_BASE_URL = env("BRIDGE_BASE_URL")
+

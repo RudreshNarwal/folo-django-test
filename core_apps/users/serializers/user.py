@@ -15,10 +15,11 @@ class DocumentSerializer(serializers.ModelSerializer):
     base64_encoded_document = serializers.CharField(write_only=True, required=True)
     signed_s3_url = serializers.SerializerMethodField(read_only=True)
     media_type = serializers.CharField(read_only=True)  # Make media_type read-only
+    document_number = serializers.CharField(required=False, allow_blank=True)
 
     class Meta:
         model = Document
-        fields = ['id', 'document_type', 'media_type', 'signed_s3_url', 'base64_encoded_document']
+        fields = ['id', 'document_type', 'media_type', 'signed_s3_url', 'base64_encoded_document', 'document_number']
 
     def get_signed_s3_url(self, obj):
         """
@@ -77,6 +78,7 @@ class DocumentSerializer(serializers.ModelSerializer):
         document, created = Document.objects.update_or_create(
             user=user,
             document_type=validated_data['document_type'],
+            document_number=validated_data.get('document_number', None),
             defaults={
                 's3_key': s3_key,
                 'media_type': media_type,
@@ -89,8 +91,7 @@ class AddressSerializer(serializers.ModelSerializer):
     class Meta:
         model = Address
         fields = [
-            'address_type', 'city', 'country',
-            'line1', 'line2', 'state', 'code'
+            'address_type', 'city', 'country', 'line1', 'line2', 'state', 'code'
         ]
 
 

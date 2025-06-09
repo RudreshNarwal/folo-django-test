@@ -8,6 +8,7 @@ from django_countries.fields import CountryField
 import pytz
 from django.db import models
 
+from core_apps.common.models import Country, State
 from core_apps.users.managers import CustomUserManager
 from generics.utils.models import GenericModel
 from django.contrib.auth.models import BaseUserManager, AbstractBaseUser, PermissionsMixin
@@ -103,7 +104,7 @@ class User(AbstractBaseUser, GenericModel, PermissionsMixin):
 
 	USERNAME_FIELD = "mobile"  # so that mobile field can be used for authentication
 
-	REQUIRED_FIELDS = ["first_name", "last_name"]
+	REQUIRED_FIELDS = ["first_name", "last_name", "email"]
 	
 	objects = CustomUserManager()
 	
@@ -240,6 +241,12 @@ class Address(GenericModel):
 	line2 = models.CharField(max_length=255, blank=True, null=True)
 	state = models.CharField(max_length=100)
 	code = models.CharField(max_length=20)
+	state_master = models.ForeignKey(
+		State, on_delete=models.CASCADE, related_name='addresses', blank=True, null=True
+	)
+	country_master = models.ForeignKey(
+		Country, on_delete=models.CASCADE, related_name='addresses', blank=True, null=True
+	)
 	
 	def __str__(self):
 		return f"Address for {self.user.mobile}"

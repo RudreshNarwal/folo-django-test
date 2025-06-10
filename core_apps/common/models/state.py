@@ -7,7 +7,7 @@ class State(models.Model):
     """
     Represents a state, associated with a country.
     """
-    name = models.CharField(max_length=100)
+    name = models.CharField(max_length=1024)
     code = models.CharField(max_length=10)
     country = models.ForeignKey(Country, related_name='states', on_delete=models.CASCADE)
 

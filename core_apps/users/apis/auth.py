@@ -18,6 +18,7 @@ from rest_framework.permissions import IsAuthenticated
 
 from ..serializers.user import UserSerializer
 
+
 class AuthView(viewsets.ViewSet):
     model = User
     permission_classes = [AllowAny]

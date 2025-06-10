@@ -21,7 +21,7 @@ class GatewayRejectionError(VerificationCodeError):
 def send_verification_code(mobile, code):
     message = f"Your Folo verification code is: {code}"
 
-    if mobile.startswith('254'):
+    if mobile.startswith('+254'):
         data = {
             "username": "folomoney",
             "to": mobile,
@@ -55,8 +55,12 @@ def send_verification_code(mobile, code):
             raise VerificationCodeError(f"Failed to send verification code due to a network or HTTP error: {e}")
     else:
         client = Client(settings.TWILIO_SID, settings.TWILIO_AUTH_TOKEN)
-        message = client.messages.create(
-            to=mobile,
-            from_="+15017250604",
-            body=message
-        )
+        try:
+            client.messages.create(
+                to=mobile,
+                from_=settings.TWILIO_PHONE_NUMBER,
+                body=message
+            )
+        except Exception as e:
+            raise VerificationCodeError("Failed to send verification code via Twilio: " + str(e))
+        return "Successfully sent verification code via Twilio"

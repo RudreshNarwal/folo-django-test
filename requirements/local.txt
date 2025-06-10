@@ -12,3 +12,4 @@ pytest-factoryboy==2.5.1
 Faker==18.3.1
 pytest-cov==4.0.0
 whitenoise==6.6.0
+twilio==9.6.2

@@ -28,34 +28,33 @@ class AuthView(viewsets.ViewSet):
 
     @action(methods=['POST'], detail=False)
     def send_otp(self, request):
- 
         serializer = RegisterUserMobileSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        
+
         mobile = serializer.validated_data.get('mobile')
         country_code = serializer.validated_data.get('country_code')
-        
-        # Now, you can use the mobile and country_code variables to look up the user
-        user = self.model.objects.filter(mobile=mobile, country_code=country_code).first()
 
-        if user is not None:
+        user = self.model.objects.filter(mobile=mobile).first()
+
+        if user:
+            # If user exists, update country code if necessary and send OTP
+            if user.country_code != country_code:
+                user.country_code = country_code
+                user.save(update_fields=['country_code'])
+
             otp = user.send_otp()
             return Response({
                 "is_registered": user.email is not None,
                 "message": "Otp sent successfully !!"
             }, status=status.HTTP_200_OK)
-
-        if user is None:
-            serializer = RegisterUserMobileSerializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
+        else:
+            # If user does not exist, create a new one and send OTP
             user = serializer.save()
             otp = user.send_otp()
             return Response({
                 "is_registered": user.email is not None,
                 "message": "Otp sent successfully !!"
             }, status=status.HTTP_201_CREATED)
-
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     @action(methods=['POST'], detail=False)
     def verify_otp(self, request):

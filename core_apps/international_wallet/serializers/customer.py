@@ -12,20 +12,14 @@ class _UserForCustomerSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'pkid', 'mobile', 'pkid']
+        fields = ['id', 'username', 'mobile', 'email']
 
 
 class CustomerSerializer(serializers.ModelSerializer):
     """
-    Serializer for the Customer model.
+    Read-only serializer for the Customer model.
     """
-    # Use the nested serializer for read operations to show user details
     user = _UserForCustomerSerializer(read_only=True)
-
-    # Allow writing the user ID for creation/association
-    user_id = serializers.PrimaryKeyRelatedField(
-        queryset=User.objects.all(), source='user', write_only=True
-    )
 
     class Meta:
         model = Customer
@@ -35,9 +29,8 @@ class CustomerSerializer(serializers.ModelSerializer):
             'current_status',
             'provider',
             'signed_agreement_id',
-            'user',  # for reading
-            'user_id',  # for writing
+            'user',
             'created_on',
             'updated_on'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'user']
+        read_only_fields = fields  # Make all fields read-only

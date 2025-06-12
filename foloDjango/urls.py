@@ -6,6 +6,7 @@ from drf_yasg.views import get_schema_view
 from rest_framework import permissions
 from rest_framework.routers import DefaultRouter
 
+from core_apps.international_wallet.views.customer import CustomerViewSet
 from core_apps.payments.apis.subscription import ActiveSubscriptionAPIView, PlanAPIView
 from core_apps.payments.apis.transaction import InitiateTransactionAPIView, MpesaCallbackAPIView, \
     TransactionCeleryDetailTest, \
@@ -33,6 +34,8 @@ router = DefaultRouter()
 router.register(r'api/v1/auth', auth.AuthView, basename='auth')
 router.register(r'api/v1/users', user.UserViewSet, basename='users')
 router.register(r'api/v1/tu', CreditReportViewSet, basename='tu')
+router.register(r'international-customer', CustomerViewSet, basename='customer')
+
 
 urlpatterns = [
     path("redoc/", schema_view.with_ui("redoc", cache_timeout=0)),

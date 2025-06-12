@@ -15,7 +15,7 @@ class DocumentSerializer(serializers.ModelSerializer):
     base64_encoded_document = serializers.CharField(write_only=True, required=True)
     signed_s3_url = serializers.SerializerMethodField(read_only=True)
     media_type = serializers.CharField(read_only=True)  # Make media_type read-only
-    document_number = serializers.CharField(required=False, allow_blank=True)
+    document_number = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
     class Meta:
         model = Document

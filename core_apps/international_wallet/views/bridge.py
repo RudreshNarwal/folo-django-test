@@ -66,7 +66,7 @@ class RequestTOSLinkAPI(APIView):
                 # Create the Customer instance with the signed agreement ID
                 Customer.objects.create(
                     user=request.user,
-                    provider=Customer.Provider.BRIDGE,
+                    provider='BRIDGE',
                     signed_agreement_id=signed_agreement_id,
                     created_by=request.user,
                 )

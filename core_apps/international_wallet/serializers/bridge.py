@@ -76,7 +76,7 @@ class CreateCustomerSerializer(serializers.Serializer):
             )
 
         # User country
-        user_country_code = request_user.country_master.code
+        user_country_code = address.country_master.code
 
         # Validate that the user is verified and has all required fields
         if not request_user.is_mobile_verified:
@@ -173,7 +173,7 @@ class CreateCustomerSerializer(serializers.Serializer):
 
             data["employment_status"] = employment_status.lower()
             data["expected_monthly_payments"] = str(expected_monthly_payments)
-            data["acting_as_intermediary"] = "yes" if acting_as_intermediary else "no"
+            data["acting_as_intermediary"] = acting_as_intermediary
             data["most_recent_occupation"] = most_recent_occupation.code
             data["account_purpose"] = account_purpose.lower()
             data["account_purpose_other"] = account_purpose_other

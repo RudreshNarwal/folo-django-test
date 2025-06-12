@@ -112,7 +112,8 @@ class UserSerializer(serializers.ModelSerializer):
         fields = [
             "pkid", "id", "first_name", "middle_name", "last_name", "dob", "mobile", 'is_mobile_verified', "email",
             "gender", "nation_id", "is_email_verified", "country_code", "marital_status", "country", "city", "title",
-            "documents", "address", "district_of_birth", "bridge_signed_agreement_id"
+            "documents", "address", "district_of_birth", "employment_status", "expected_monthly_payments",
+            "acting_as_intermediary", "occupation_id", "account_purpose", "account_purpose_other", "source_of_funds"
         ]
 
     def validate_mobile(self, value):

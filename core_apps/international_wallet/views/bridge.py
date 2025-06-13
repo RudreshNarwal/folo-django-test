@@ -8,11 +8,12 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 
+from core_apps.international_wallet.models import Customer
 # Import the services and serializers
-from core_apps.international_wallet.services.bridge_services import BridgeAPIService, BridgeAPIError
+from core_apps.international_wallet.services.bridge import BridgeAPIService, BridgeAPIError
 from core_apps.international_wallet.serializers import (
     CreateCustomerSerializer,
-    InitiateTransferSerializer
+    InitiateTransferSerializer, CustomerSerializer
 )
 import requests # Import requests directly for generic RequestException handling
 
@@ -62,8 +63,13 @@ class RequestTOSLinkAPI(APIView):
 
                 # Get the session_token
                 signed_agreement_id = query_params.get('session_token', [None])[0]
-                request.user.bridge_signed_agreement_id = signed_agreement_id
-                request.user.save(update_fields=["bridge_signed_agreement_id"])
+                # Create the Customer instance with the signed agreement ID
+                Customer.objects.create(
+                    user=request.user,
+                    provider='BRIDGE',
+                    signed_agreement_id=signed_agreement_id,
+                    created_by=request.user,
+                )
 
             return Response(response_data, status=status.HTTP_200_OK)
         except BridgeAPIError as e:
@@ -115,7 +121,19 @@ class CreateCustomerAPI(APIView):
                                 status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
             response_data = bridge_service.create_customer(customer_data)
-            return Response(response_data, status=status.HTTP_200_OK) # Bridge API usually returns 200 OK
+            # Update a Customer instance in the database
+            Customer.objects.filter(
+                user=request.user,
+                provider='BRIDGE'
+            ).update(
+                customer_id=response_data.get("id"),
+                current_status=response_data.get("status").upper(),
+                updated_by=request.user,
+            )
+            return Response(
+                CustomerSerializer(Customer.objects.get(user=request.user, provider='BRIDGE')).data,
+                status=status.HTTP_200_OK
+            ) # Bridge API usually returns 200 OK
         except BridgeAPIError as e:
             logger.error(f"Error creating customer via Bridge API: {str(e)}", exc_info=True)
             return Response(

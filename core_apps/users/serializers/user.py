@@ -15,7 +15,7 @@ class DocumentSerializer(serializers.ModelSerializer):
     base64_encoded_document = serializers.CharField(write_only=True, required=True)
     signed_s3_url = serializers.SerializerMethodField(read_only=True)
     media_type = serializers.CharField(read_only=True)  # Make media_type read-only
-    document_number = serializers.CharField(required=False, allow_blank=True)
+    document_number = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
     class Meta:
         model = Document
@@ -112,7 +112,8 @@ class UserSerializer(serializers.ModelSerializer):
         fields = [
             "pkid", "id", "first_name", "middle_name", "last_name", "dob", "mobile", 'is_mobile_verified', "email",
             "gender", "nation_id", "is_email_verified", "country_code", "marital_status", "country", "city", "title",
-            "documents", "address", "district_of_birth", "bridge_signed_agreement_id"
+            "documents", "address", "district_of_birth", "employment_status", "expected_monthly_payments",
+            "acting_as_intermediary", "occupation_id", "account_purpose", "account_purpose_other", "source_of_funds"
         ]
 
     def validate_mobile(self, value):

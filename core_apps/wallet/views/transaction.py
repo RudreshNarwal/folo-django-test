@@ -34,6 +34,41 @@ from ..services.dtb_services import (
 logger = logging.getLogger(__name__)
 
 
+# Event Manager Mixin
+class TransactionEventManagerMixin:
+    """Mixin to handle transaction event emissions."""
+    def _emit_transaction_event(self, transaction, old_status, new_status):
+        """Helper method to emit a transaction status change event."""
+        if old_status == new_status:
+            return  # No change, no event
+
+        try:
+            # Determine transaction_id based on instance type
+            if isinstance(transaction, Transaction):
+                transaction_id = str(transaction.transaction_id)
+                user_id = transaction.user.id
+            elif isinstance(transaction, TopUpTransaction):
+                transaction_id = str(transaction.external_unique_id)
+                user_id = transaction.wallet.user.id
+            else:
+                logger.warning("Attempted to emit event for unknown transaction type.")
+                return
+
+            event_data = {
+                "transaction_id": transaction_id,
+                "old_status": old_status,
+                "new_status": new_status,
+                "timestamp": timezone.now().isoformat(),
+                "user_id": user_id
+            }
+            
+            # Log the event. Replace with your actual event system (WebSockets, etc.)
+            logger.info(f"Transaction status event: {event_data}")
+            
+        except Exception as e:
+            logger.error(f"Error emitting status event: {e}")
+
+
 # Helper function to get or create/update contact
 def get_or_create_update_contact(user, phone_number, name=None):
     contact, created = UserContact.objects.get_or_create(
@@ -164,7 +199,7 @@ class WalletToWalletTransferAPIView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-class WalletToMpesaTransferAPIView(APIView):
+class WalletToMpesaTransferAPIView(TransactionEventManagerMixin, APIView):
     """
     API view for transfers initiated via phone number.
     Performs Wallet-to-MPESA transfer.
@@ -322,7 +357,7 @@ class WalletToMpesaTransferAPIView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-class MpesaWithdrawalWebhookAPIView(APIView):
+class MpesaWithdrawalWebhookAPIView(TransactionEventManagerMixin, APIView):
     """
     Webhook endpoint for MPESA withdrawal status updates.
     This should be configured as the callback URL in the MPESA withdrawal request.
@@ -794,7 +829,7 @@ class WalletTransactionSummaryAPIView(APIView):
         return Response(summary, status=status.HTTP_200_OK)
 
 
-class TransactionStatusAPIView(APIView):
+class TransactionStatusAPIView(TransactionEventManagerMixin, APIView):
     """
     API view to get current status of any transaction (Transfer or TopUp).
     
@@ -833,7 +868,7 @@ class TransactionStatusAPIView(APIView):
             
             # Emit events if status changed and events are enabled
             if emit_events and old_status != transaction_obj.status:
-                self._emit_status_event(transaction_obj, old_status, transaction_obj.status)
+                self._emit_transaction_event(transaction_obj, old_status, transaction_obj.status)
             
             # Return formatted response
             return Response({

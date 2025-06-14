@@ -327,6 +327,40 @@ class BridgeAPIService:
             logger.error(f"Failed to create customer: {e}")
             raise
 
+
+    def external_account(self, external_account_data: dict) -> dict:
+        """
+        Attempts to add an external account by making a request to the specified endpoint. The method
+        uses the provided external account data to perform the operation.
+
+        Args:
+            external_account_data (dict): A dictionary containing the data required to add an external
+            account. This dictionary must include a 'customer_id' key to indicate the associated
+            customer.
+
+        Returns:
+            dict: The response returned by the request made to the external API.
+
+        Raises:
+            BridgeAPIError: If there is an API-specific error when making the request.
+            requests.exceptions.RequestException: If there is a general request issue, such as a
+            connectivity problem.
+        """
+        logger.info("Attempting to add an external account.")
+        try:
+            response = self._make_request(
+                method="POST",
+                endpoint=f"/v0/customers/{external_account_data.pop('customer_id')}/external_accounts",
+                data=external_account_data,
+                include_idempotency_key=True
+            )
+            logger.info("External account added successfully.")
+            return response
+        except (BridgeAPIError, requests.exceptions.RequestException) as e:
+            logger.error(f"Failed to add external account: {e}")
+            raise
+
+
     def initiate_transfer(self, transfer_data: dict) -> dict:
         """
         Initiates a money movement transfer (e.g., crypto to fiat, fiat to crypto).

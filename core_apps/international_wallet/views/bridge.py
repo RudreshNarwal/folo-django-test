@@ -20,6 +20,8 @@ from core_apps.international_wallet.serializers import (
 )
 import requests # Import requests directly for generic RequestException handling
 
+from core_apps.international_wallet.services.bridge import HasValidWebhookSignature
+
 # Configure logging
 logger = logging.getLogger(__name__)
 
@@ -316,3 +318,45 @@ class InitiateTransferAPI(APIView):
                 {"error": {"message": "Internal Server Error.", "details": str(e)}},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+class WebhookReceiverAPIView(APIView):
+    """
+    Processes incoming webhooks using DRF. Signature validation is handled by the custom permission class.
+    """
+    permission_classes = [HasValidWebhookSignature]
+
+    def post(self, request, *args, **kwargs):
+        """
+        Handles the POST request after the signature has been validated.
+        """
+        # The permission class has already verified the signature and parsed the JSON payload. The raw body is in
+        #  the request body, and the parsed dictionary is in request.data.
+        event_payload = request.data
+        if not event_payload:
+            logger.error("Received empty event payload.")
+            return Response(
+                {"error": {"message": "Empty event payload received.", "code": 400}},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        international_wallet_txn_service = InternationalWalletTransactionService()
+        international_wallet_txn_service.update_transaction(
+            event_payload.get("id"),
+            **{
+                "client_reference_id": event_payload.get("client_reference_id"),
+                "state": event_payload.get("state").upper(),
+                "receipt_url": event_payload.get("receipt", {}).get("url", None),
+                "to_address": event_payload.get("source_deposit_instructions", {}).get("to_address", None),
+                "final_amount": event_payload.get("receipt", {}).get("final_amount", None),
+                "developer_fee": event_payload.get("receipt", {}).get("developer_fee", None),
+                "exchange_fee": event_payload.get("receipt", {}).get("exchange_fee", None),
+                "gas_fee": event_payload.get("receipt", {}).get("gas_fe", None),
+                "webhook_response": request.data
+            }
+        )
+
+        return Response(
+            {"message": "Event processing OK!"},
+            status=status.HTTP_200_OK
+        )

@@ -1,4 +1,14 @@
+import base64
+import hashlib
+import re
+from datetime import datetime, timedelta
+
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives.serialization import load_pem_public_key
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import padding
 from django.utils import timezone
+from rest_framework.permissions import BasePermission
 
 from core_apps.common.services.api_logging_service import APILoggingService
 from django.conf import settings
@@ -405,3 +415,89 @@ class BridgeAPIService:
         except (BridgeAPIError, requests.exceptions.RequestException) as e:
             logger.error(f"Failed to initiate transfer: {e}")
             raise
+
+
+# --- Helper Function for Verification ---
+# This function can be reused easily.
+def verify_signature(timestamp: str, body_data: bytes, signature: str) -> bool:
+    """
+    Verifies the webhook signature using the public key.
+
+    Args:
+        timestamp: The timestamp string from the 't' part of the header.
+        body_data: The raw request body as bytes.
+        signature: The base64-encoded signature from the 'v0' part of the header.
+
+    Returns:
+        True if the signature is valid, False otherwise.
+    """
+    if not all([timestamp, body_data, signature]):
+        return False
+
+    data_to_verify = f"{timestamp}.".encode('utf-8') + body_data
+    digest = hashlib.sha256(data_to_verify).digest()
+
+    try:
+        webhook_public_key = settings.WEBHOOK_PUBLIC_KEY
+
+        if not webhook_public_key:
+            return False
+
+        formatted_pem = webhook_public_key.replace('\\n', '\n')
+        if not formatted_pem.startswith('-----BEGIN PUBLIC KEY-----'):
+            formatted_pem = f"-----BEGIN PUBLIC KEY-----\n{formatted_pem}\n-----END PUBLIC KEY-----"
+
+        public_key = load_pem_public_key(formatted_pem.encode())
+        decoded_signature = base64.b64decode(signature)
+        public_key.verify(
+            decoded_signature,
+            digest,
+            padding.PKCS1v15(),
+            hashes.SHA256()
+        )
+        return True
+    except (InvalidSignature, TypeError, ValueError) as e:
+        print(f"Signature verification failed: {str(e)}")  # For debugging
+        return False
+
+
+class HasValidWebhookSignature(BasePermission):
+    """
+    DRF Permission to validate the webhook signature before the view is called.
+    """
+    message = "Invalid webhook signature."
+
+    def has_permission(self, request, view):
+        # 1. Get header
+        signature_header = request.headers.get("X-Webhook-Signature")
+        if not signature_header:
+            self.message = "Malformed signature header: Header not found."
+            return False
+
+        # 2. Parse header
+        match = re.match(r"^t=(\d+),v0=(.*)$", signature_header)
+        if not match:
+            self.message = "Malformed signature header: Does not match expected format."
+            return False
+
+        timestamp, signature = match.groups()
+        if not timestamp or not signature:
+            self.message = "Malformed signature header: Missing timestamp or signature."
+            return False
+
+        # 3. Check timestamp
+        try:
+            event_time = datetime.fromtimestamp(int(timestamp) / 1000)
+            if event_time < datetime.now() - timedelta(minutes=10):
+                self.message = "Invalid signature: Timestamp is too old."
+                return False
+        except (ValueError, OSError):
+            self.message = "Invalid timestamp format."
+            return False
+
+        # 4. Verify signature
+        if not verify_signature(timestamp, json.dumps(request.data, separators=(',', ':')).encode('utf-8'), signature):
+            self.message = "Invalid signature!"
+            return False
+
+        return True

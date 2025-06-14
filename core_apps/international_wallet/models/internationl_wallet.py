@@ -1,4 +1,3 @@
-import uuid
 from django.db import models
 from django.conf import settings
 
@@ -107,13 +106,6 @@ class InternationalWalletTransaction(GenericModel):
 
     def __str__(self):
         return f"Transaction {self.id} for {self.customer.user.username} - {self.state}"
-
-    def mark_as_funds_received(self):
-        """Helper method to mark a transaction as succeeded."""
-        from django.utils import timezone
-        self.state = self.TransactionState.FUNDS_RECEIVED
-        self.succeeded_at = timezone.now()
-        self.save(update_fields=['state', 'succeeded_at', 'updated_on'])
 
     def mark_as_failed(self):
         """Helper method to mark a transaction as failed."""

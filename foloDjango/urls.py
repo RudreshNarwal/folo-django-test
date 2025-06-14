@@ -7,6 +7,7 @@ from rest_framework import permissions
 from rest_framework.routers import DefaultRouter
 
 from core_apps.international_wallet.views.customer import CustomerViewSet
+from core_apps.international_wallet.views.external_bank_account import ExternalBankAccountViewSet
 from core_apps.payments.apis.subscription import ActiveSubscriptionAPIView, PlanAPIView
 from core_apps.payments.apis.transaction import InitiateTransactionAPIView, MpesaCallbackAPIView, \
     TransactionCeleryDetailTest, \
@@ -35,6 +36,7 @@ router.register(r'api/v1/auth', auth.AuthView, basename='auth')
 router.register(r'api/v1/users', user.UserViewSet, basename='users')
 router.register(r'api/v1/tu', CreditReportViewSet, basename='tu')
 router.register(r'international-customer', CustomerViewSet, basename='customer')
+router.register(r'international-customer-external-account', ExternalBankAccountViewSet, basename='external-account')
 
 
 urlpatterns = [

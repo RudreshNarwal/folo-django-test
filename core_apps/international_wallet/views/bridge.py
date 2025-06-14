@@ -9,11 +9,11 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 
 from core_apps.international_wallet.models import Customer
+from core_apps.international_wallet.services.external_bank_account import ExternalBankAccountService
 # Import the services and serializers
 from core_apps.international_wallet.services.bridge import BridgeAPIService, BridgeAPIError
 from core_apps.international_wallet.serializers import (
-    CreateCustomerSerializer,
-    InitiateTransferSerializer, CustomerSerializer
+    CreateCustomerSerializer, CustomerSerializer, ExternalAccountSerializer, InitiateTransferSerializer
 )
 import requests # Import requests directly for generic RequestException handling
 
@@ -148,6 +148,74 @@ class CreateCustomerAPI(APIView):
             )
         except Exception as e:
             logger.error(f"Unexpected error in CreateCustomerAPI: {e}", exc_info=True)
+            return Response(
+                {"error": {"message": "Internal Server Error.", "details": str(e)}},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class ExternalAccountAPI(APIView):
+    """
+    API endpoint to associate the external accounts through the Bridge API.
+
+    - Requires authentication (IsAuthenticated).
+    - Expects a JSON POST request with external account details.
+    - Returns a JSON response with the external account details or an error.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        """
+        Handles POST requests an external account.
+        """
+        serializer = ExternalAccountSerializer(data=request.data, context={"request": self.request})
+        if not serializer.is_valid():
+            logger.warning(f"Invalid request data for external account: {serializer.errors}")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        external_account_data = serializer.validated_data
+
+        try:
+            # Initialize the Bridge API service
+            bridge_service = BridgeAPIService()
+            if not bridge_service:
+                return Response({"error": {"message": "API Service not initialized.", "code": 500}},
+                                status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            response_data = bridge_service.external_account(external_account_data)
+
+            # Update the account instance with the external account details
+            external_bank_account_service = ExternalBankAccountService()
+            external_bank_account_service.create_bank_account(
+                user=request.user,
+                data={
+                    "customer_id": external_account_data.get("customer_id"),
+                    "account_owner_name": external_account_data.get("account_owner_name"),
+                    "bank_name": external_account_data.get("bank_name"),
+                    "account_name": external_account_data.get("account_name"),
+                    "account_number": external_account_data.get("account_number"),
+                    "iban": external_account_data.get("iban", None),
+                    "swift_bic": external_account_data.get("swift_bic", None),
+                    "routing_number": external_account_data.get("routing_number"),
+                    "currency": response_data.get("currency", "na").upper(),
+                    "account_type": response_data.get("account_type", "Unknown").upper(),
+                }
+            )
+            return Response(response_data, status=status.HTTP_200_OK) # Bridge API usually returns 200 OK
+        except BridgeAPIError as e:
+            logger.error(f"Error external account via Bridge API: {str(e)}", exc_info=True)
+            return Response(
+                {"error": {"message": str(e), "code": e.status_code, "details": e.response_data}},
+                status=e.status_code
+            )
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Network error external account: {e}", exc_info=True)
+            return Response(
+                {"error": {"message": "Network or external service error.", "details": str(e)}},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
+        except Exception as e:
+            logger.error(f"Unexpected error in ExternalAccountAPI: {e}", exc_info=True)
             return Response(
                 {"error": {"message": "Internal Server Error.", "details": str(e)}},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR

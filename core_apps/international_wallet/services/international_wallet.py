@@ -1,4 +1,5 @@
-from typing import Dict, Any, Optional
+from django.utils import timezone
+from typing import Any, Optional
 from django.db import transaction
 from django.contrib.auth import get_user_model
 from core_apps.international_wallet.models.internationl_wallet import InternationalWalletTransaction
@@ -81,13 +82,12 @@ class InternationalWalletTransactionService:
                     # Ensure we don't try to update fields that don't exist
                     if hasattr(transaction_obj, key):
                         setattr(transaction_obj, key, value)
+                        print(key, value)
+                        if key == "state" and value == "FUNDS_RECEIVED":
+                            # If we are updating the state to funds received, set succeeded_at
+                            setattr(transaction_obj, "succeeded_at", timezone.now())
 
                 transaction_obj.save()
-
-                # Example of post-update logic
-                if data.get('state') == "funds_received":
-                    # If we just updated the state to fund received, ensure succeeded_at is set.
-                    transaction_obj.mark_as_funds_received()
 
                 return transaction_obj
         except InternationalWalletTransaction.DoesNotExist:

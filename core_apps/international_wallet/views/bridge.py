@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.http import JsonResponse
 import logging
 from urllib.parse import urlparse, parse_qs
@@ -8,15 +9,18 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 
-from core_apps.international_wallet.models import Customer
-from core_apps.international_wallet.services.external_bank_account import ExternalBankAccountService
-# Import the services and serializers
-from core_apps.international_wallet.services.bridge import BridgeAPIService, BridgeAPIError
+from core_apps.international_wallet.models import Customer, InternationalWalletTransaction
+from core_apps.international_wallet.services import (
+    ExternalBankAccountService, BridgeAPIService, BridgeAPIError, InternationalWalletTransactionService
+)
+
 from core_apps.international_wallet.serializers import (
-    CreateCustomerSerializer, CustomerSerializer, ExternalAccountSerializer, InitiateTransferSerializer
+    CreateCustomerSerializer, CustomerSerializer, ExternalAccountSerializer, InitiateTransferSerializer,
+    InternationalWalletTransactionSerializer
 )
 import requests # Import requests directly for generic RequestException handling
 
+# Configure logging
 logger = logging.getLogger(__name__)
 
 
@@ -41,6 +45,7 @@ class RequestTOSLinkAPI(APIView):
     """
     permission_classes = [IsAuthenticated]
 
+    @transaction.atomic()
     def post(self, request, *args, **kwargs):
         """
         Handles POST requests to get a TOS link.
@@ -102,6 +107,7 @@ class CreateCustomerAPI(APIView):
     """
     permission_classes = [IsAuthenticated]
 
+    @transaction.atomic()
     def post(self, request, *args, **kwargs):
         """
         Handles POST requests to create a customer.
@@ -164,6 +170,7 @@ class ExternalAccountAPI(APIView):
     """
     permission_classes = [IsAuthenticated]
 
+    @transaction.atomic()
     def post(self, request, *args, **kwargs):
         """
         Handles POST requests an external account.
@@ -186,7 +193,7 @@ class ExternalAccountAPI(APIView):
 
             # Update the account instance with the external account details
             external_bank_account_service = ExternalBankAccountService()
-            external_bank_account_service.create_bank_account(
+            external_bank_account = external_bank_account_service.create_bank_account(
                 user=request.user,
                 data={
                     "customer_id": external_account_data.get("customer_id"),
@@ -201,7 +208,7 @@ class ExternalAccountAPI(APIView):
                     "account_type": response_data.get("account_type", "Unknown").upper(),
                 }
             )
-            return Response(response_data, status=status.HTTP_200_OK) # Bridge API usually returns 200 OK
+            return Response(ExternalAccountSerializer(external_bank_account).data, status=status.HTTP_200_OK) # Bridge API usually returns 200 OK
         except BridgeAPIError as e:
             logger.error(f"Error external account via Bridge API: {str(e)}", exc_info=True)
             return Response(
@@ -232,6 +239,7 @@ class InitiateTransferAPI(APIView):
     """
     permission_classes = [IsAuthenticated]
 
+    @transaction.atomic()
     def post(self, request, *args, **kwargs):
         """
         Handles POST requests to initiate a transfer.
@@ -242,6 +250,28 @@ class InitiateTransferAPI(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         transfer_data = serializer.validated_data
+        # Create the InternationalWalletTransaction instance with the transfer details
+        international_wallet_txn_service = InternationalWalletTransactionService()
+        wallet_transaction = international_wallet_txn_service.create_transaction(
+            user=request.user,
+            **{
+                "amount": transfer_data.get("amount"),
+                "source_payment_rail": transfer_data.pop("source_payment_rail").upper(),
+                "source_currency": transfer_data.pop("source_currency").upper(),
+                "from_address": transfer_data.pop("from_address"),
+                "destination_payment_rail": transfer_data.pop("destination_payment_rail").upper(),
+                "destination_currency": transfer_data.pop("destination_currency").upper(),
+                "external_account_id": transfer_data.pop("external_account_id"),
+                "customer_id": transfer_data.pop("customer_id"),
+            }
+        )
+
+        if not wallet_transaction:
+            logger.error("Failed to create InternationalWalletTransaction.")
+            return Response(
+                {"error": {"message": "Failed to create transaction.", "code": 500}},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
         try:
             # Initialize the Bridge API service
@@ -251,7 +281,23 @@ class InitiateTransferAPI(APIView):
                                 status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
             response_data = bridge_service.initiate_transfer(transfer_data)
-            return Response(response_data, status=status.HTTP_200_OK) # Bridge API usually returns 200 OK
+            # Update the InternationalWalletTransaction instance with the transfer details
+            international_wallet_txn_service.update_transaction(
+                wallet_transaction.transaction_id,
+                **{
+                    "transaction_id": response_data.get("id"),
+                    "client_reference_id": response_data.get("client_reference_id"),
+                    "state": response_data.get("status").upper(),
+                    "to_address": transfer_data.get("source_deposit_instructions", {}).get("to_address", None),
+                    "receipt_url": response_data.get("receipt", {}).get("url", None),
+                    "final_amount": response_data.get("receipt", {}).get("final_amount", None),
+                    "developer_fee": response_data.get("receipt", {}).get("developer_fee", None),
+                    "exchange_fee": response_data.get("receipt", {}).get("exchange_fee", None),
+                    "gas_fee": response_data.get("receipt", {}).get("gas_fe", None),
+                    "updated_by": request.user
+                }
+            )
+            return Response(InternationalWalletTransactionSerializer(InternationalWalletTransaction.objects.get()).data, status=status.HTTP_200_OK) # Bridge API usually returns 200 OK
         except BridgeAPIError as e:
             logger.error(f"Error initiating transfer via Bridge API: {str(e)}", exc_info=True)
             return Response(

@@ -351,24 +351,97 @@ class ExternalAccountSerializer(serializers.Serializer):
         return data
 
 
-class DestinationSerializer(serializers.Serializer):
-    """
-    Serializer for the destination nested field within transfer initiation.
-    """
-    payment_rail = serializers.CharField(max_length=50) # e.g., "wire", "ach"
-    currency = serializers.CharField(max_length=10) # e.g., "usd"
-    external_account_id = serializers.CharField(max_length=255, help_text="ID of the registered external bank account.")
-
-
 class InitiateTransferSerializer(serializers.Serializer):
     """
     Serializer for the initiate_transfer_api endpoint.
     Validates all required fields for transfer initiation.
     """
     amount = serializers.CharField(max_length=50, help_text="Amount as a string (important for decimals, e.g., '100.00').")
-    on_behalf_of = serializers.CharField(max_length=255, help_text="The ID of the customer initiating the transfer.")
-    source = serializers.DictField(required=False, help_text="Source details (can be empty if implied by from_address).")
-    payment_rail = serializers.CharField(max_length=50, help_text="Source payment rail (e.g., 'polygon', 'ethereum').")
-    currency = serializers.CharField(max_length=10, help_text="Currency of the source asset (e.g., 'usdc', 'eth').")
-    from_address = serializers.CharField(max_length=255, required=False, allow_blank=True, help_text="Source crypto address for crypto-to-fiat.")
-    destination = DestinationSerializer() # Nested serializer
+    source_payment_rail = serializers.CharField(
+        max_length=50, help_text="Payment rail for the source (e.g., 'wire', 'ach')."
+    )
+    source_currency = serializers.CharField(
+        max_length=10, help_text="Currency for the source (e.g., 'usd')."
+    )
+    from_address = serializers.CharField(
+        max_length=255, help_text="ID of the registered external bank account."
+    )
+    destination_payment_rail = serializers.CharField(
+        max_length=50, help_text="Payment rail for the destination (e.g., 'wire', 'ach')."
+    )
+    destination_currency = serializers.CharField(
+        max_length=10, help_text="Currency for the destination (e.g., 'usd')."
+    )
+    external_account_id = serializers.CharField(
+        max_length=255, help_text="ID of the registered external bank account."
+    )
+
+    def validate(self, data):
+        """
+        Custom validation to ensure that all data is present and valid.
+        """
+        # Ensure the request context is available
+        request_user = self.context.get("request").user
+
+        try:
+            customer = Customer.objects.get(
+                user=request_user,
+                provider='BRIDGE',
+            )
+        except Customer.DoesNotExist:
+            customer = None
+
+        if not customer:
+            raise serializers.ValidationError("International customer not found for this user.")
+
+        # Check if the user has signed the Bridge terms of service
+        if customer.current_status != 'ACTIVE':
+            raise serializers.ValidationError("International customer not onboarded yet.")
+
+        # Validate that the user is verified and has all required fields
+        if not request_user.is_mobile_verified:
+            raise serializers.ValidationError("User's mobile number must be verified to create a transfer.")
+
+        amount = data.get("amount")
+        if not amount or float(amount) <= 0:
+            raise serializers.ValidationError("Amount must be a positive number.")
+
+        source_payment_rail = data.get("source_payment_rail")
+        if not source_payment_rail:
+            raise serializers.ValidationError("Source payment rail is required for transfer initiation.")
+
+        source_currency = data.get("source_currency")
+        if not source_currency:
+            raise serializers.ValidationError("Source currency is required for transfer initiation.")
+
+        from_address = data.get("from_address")
+        if not from_address:
+            raise serializers.ValidationError("From address is required for transfer initiation.")
+
+        destination_payment_rail = data.get("destination_payment_rail")
+        if not destination_payment_rail:
+            raise serializers.ValidationError("Destination payment rail is required for transfer initiation.")
+
+        destination_currency = data.get("destination_currency")
+        if not destination_currency:
+            raise serializers.ValidationError("Destination currency is required for transfer initiation.")
+
+        external_account_id = data.get("external_account_id")
+        if not external_account_id:
+            raise serializers.ValidationError("External account ID is required for transfer initiation.")
+
+        data["amount"] = str(amount)
+        data["on_behalf_of"] = customer.customer_id
+        data["customer_id"] = customer.id
+        data["source"] = {
+            "payment_rail": source_payment_rail,
+            "currency": source_currency,
+            "from_address": from_address
+        }
+        data["destination"] = {
+            "payment_rail": destination_payment_rail,
+            "currency": destination_currency,
+            "external_account_id": external_account_id
+        }
+
+        return data

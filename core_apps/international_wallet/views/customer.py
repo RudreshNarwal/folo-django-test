@@ -2,6 +2,7 @@ from rest_framework import viewsets, filters
 from django_filters.rest_framework import DjangoFilterBackend
 from core_apps.international_wallet.models.customer import Customer
 from core_apps.international_wallet.serializers.customer import CustomerSerializer
+from generics.utils.pagination import StandardResultSetPagination
 
 
 class CustomerViewSet(viewsets.ReadOnlyModelViewSet):
@@ -14,6 +15,7 @@ class CustomerViewSet(viewsets.ReadOnlyModelViewSet):
     """
     serializer_class = CustomerSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    pagination_class = StandardResultSetPagination
 
     # Define fields available for filtering (e.g., /international-customer/?provider=Bridge)
     filterset_fields = ['current_status', 'provider']

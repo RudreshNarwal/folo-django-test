@@ -3,3 +3,4 @@ from core_apps.international_wallet.serializers.bridge import (
 )
 from core_apps.international_wallet.serializers.customer import CustomerSerializer
 from core_apps.international_wallet.serializers.external_bank_account import ExternalBankAccountSerializer
+from core_apps.international_wallet.serializers.international_wallet import InternationalWalletTransactionSerializer

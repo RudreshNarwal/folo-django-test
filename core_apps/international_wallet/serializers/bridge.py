@@ -130,6 +130,10 @@ class CreateCustomerSerializer(serializers.Serializer):
         if not dob:
             raise serializers.ValidationError("User must have a date of birth to create a customer.")
 
+        passport_front = request_user.documents.filter(document_type='PASSPORT', document_number__isnull=False).first()
+        if user_country_code != 'US' and not passport_front:
+            raise serializers.ValidationError("User must have a passport front document to create a customer.")
+
         data["type"] = "individual"
         data["first_name"] = first_name
         data["last_name"] = last_name
@@ -139,12 +143,16 @@ class CreateCustomerSerializer(serializers.Serializer):
         data["birth_date"] = dob.strftime("%Y-%m-%d")
         data["signed_agreement_id"] = bridge_signed_agreement_id
         if user_country_code == 'US':
-            ssn = request_user.documents.filter(document_type='SOCIAL_SECURITY_NUMBER').first()
+            ssn = request_user.documents.filter(
+                document_type='SOCIAL_SECURITY_NUMBER', document_number__isnull=False
+            ).first()
             if not ssn:
                 raise serializers.ValidationError(
                     "User must have a social security number document to create a customer.")
 
-            dl_front = request_user.documents.filter(document_type='DRIVERS_LICENSE').first()
+            dl_front = request_user.documents.filter(
+                document_type='DRIVERS_LICENSE', document_number__isnull=False
+            ).first()
             if not dl_front:
                 raise serializers.ValidationError(
                     "User must have a drivers license front document to create a customer.")
@@ -176,13 +184,36 @@ class CreateCustomerSerializer(serializers.Serializer):
                     "image_back": get_image_data_uri_from_signed_url(generate_presigned_url(dl_back.s3_key))
                 }
             ]
-        else:
-            passport_front = request_user.documents.filter(document_type='PASSPORT').first()
-            if user_country_code != 'US' and not passport_front:
-                raise serializers.ValidationError("User must have a passport front document to create a customer.")
+        elif user_country_code == 'GBR':
+            data["identifying_information"] = [
+                {
+                    "type": "passport",
+                    "issuing_country": address.country_master.code,
+                    "number": passport_front.document_number,
+                    "image_front": get_image_data_uri_from_signed_url(generate_presigned_url(passport_front.s3_key)),
+                }
+            ]
 
+            address_proof = request_user.documents.filter(
+                document_type__in=[
+                    'BANK_STATEMENT', 'UTILITY_BILL', 'GOVERNMENT_ISSUED_LETTER', 'RESIDENTIAL_LEASE_AGREEMENT'
+                ]
+            )
+            if not address_proof.exists():
+                raise serializers.ValidationError(
+                    "User must have a address proof document to create a customer.")
+
+            data["documents"] = {
+                {
+                    "purposes": [
+                        "proof_of_address"
+                    ],
+                    "file": get_image_data_uri_from_signed_url(generate_presigned_url(address_proof.first().s3_key))
+                }
+            }
+        else:
             passport_back = request_user.documents.filter(document_type='BACK_OF_PASSPORT').first()
-            if user_country_code != 'US' and not passport_back:
+            if not passport_back:
                 raise serializers.ValidationError("User must have a passport back document to create a customer.")
 
             employment_status = request_user.employment_status

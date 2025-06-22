@@ -284,6 +284,10 @@ class Document(GenericModel):
 		('BACK_OF_DRIVERS_LICENSE', 'Drivers License Back'),
 		('PASSPORT', 'Passport'),
 		('BACK_OF_PASSPORT', 'Passport Back'),
+		('BANK_STATEMENT', 'Bank Statement'),
+		('UTILITY_BILL', 'Utility Bill'),
+		('GOVERNMENT_ISSUED_LETTER', 'Government Issued Letter'),
+		('RESIDENTIAL_LEASE_AGREEMENT', 'Residential Lease Agreement'),
 	]
 
 	user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='documents')

@@ -281,7 +281,12 @@ class WalletToMpesaTransferAPIView(TransactionEventManagerMixin, APIView):
                 transaction.gateway = response.get('gateway')
                 transaction.gateway_transaction_id = response.get('gatewayTransactionId')
                 transaction.fee = response.get('fee', 0)
-                transaction.extra_info = response.get('extraInfo')
+                
+                # Ensure extra_info is a dictionary
+                if not transaction.extra_info:
+                    transaction.extra_info = {}
+                transaction.extra_info['initiation_response'] = response.get('extraInfo')
+                
                 transaction.save()
 
                 # Update wallet balance
@@ -310,8 +315,13 @@ class WalletToMpesaTransferAPIView(TransactionEventManagerMixin, APIView):
             else:
                 # Handle failed transaction initiation
                 transaction.status = 'FAILED'
+                
+                # Ensure extra_info is a dictionary before updating
+                if not transaction.extra_info:
+                    transaction.extra_info = {}
                 if 'extraInfo' in response:
-                    transaction.extra_info = response.get('extraInfo')
+                    transaction.extra_info['initiation_response'] = response.get('extraInfo')
+                
                 transaction.save()
                 logger.error(f"DTB MPESA Transfer initiation failed for transaction {transaction.transaction_id}: {response}")
                 return Response({
@@ -417,9 +427,11 @@ class MpesaWithdrawalWebhookAPIView(TransactionEventManagerMixin, APIView):
             if data.get('fee') is not None:
                 transaction.fee = data.get('fee')
             
-            # Store additional fields in extra_info
+            # Ensure extra_info is a dictionary before updating
             if not transaction.extra_info:
                 transaction.extra_info = {}
+            
+            # Store additional fields in extra_info
             transaction.extra_info['paymentType'] = data.get('paymentType')
             transaction.extra_info['created'] = data.get('created')
             transaction.extra_info['errorDescription'] = data.get('errorDescription', '')
@@ -940,17 +952,16 @@ class TransactionStatusAPIView(TransactionEventManagerMixin, APIView):
                         transaction_obj.withdrawal_id
                     )
                     
-                    new_status = response.get('status', transaction_obj.status)
+                    new_status = response.get('status', transaction_obj.status) if isinstance(response, dict) else transaction_obj.status
                     if new_status != transaction_obj.status:
                         transaction_obj.status = new_status
                         
-                        if response.get('errorDescription'):
+                        if isinstance(response, dict) and response.get('errorDescription'):
                             if not transaction_obj.extra_info:
                                 transaction_obj.extra_info = {}
-                            transaction_obj.extra_info['error_description'] = response.get('errorDescription')
+                            transaction_obj.extra_info['error_description_from_refresh'] = response.get('errorDescription')
                         
                         transaction_obj.save()
-                        logger.info(f"Updated transaction {transaction_obj.transaction_id} status: {new_status}")
                 
                 elif transaction_obj.transaction_type in ['WALLET_TO_BANK', 'WALLET_TO_PESALINK']:
                     # For bank transfers, update wallet balance
@@ -967,15 +978,15 @@ class TransactionStatusAPIView(TransactionEventManagerMixin, APIView):
                     transaction_obj.payment_id
                 )
                 
-                new_status = response.get('status', transaction_obj.status)
+                new_status = response.get('status', transaction_obj.status) if isinstance(response, dict) else transaction_obj.status
                 if new_status != transaction_obj.status:
                     transaction_obj.status = new_status
                     
                     if new_status == 'ERROR_PERM':
-                        transaction_obj.error_description = response.get('description', '')
+                        transaction_obj.error_description = response.get('description', '') if isinstance(response, dict) else ''
                     
-                    transaction_obj.gateway = response.get('gateway', '')
-                    transaction_obj.gateway_transaction_id = response.get('gatewayTransactionId', '')
+                    transaction_obj.gateway = response.get('gateway', '') if isinstance(response, dict) else ''
+                    transaction_obj.gateway_transaction_id = response.get('gatewayTransactionId', '') if isinstance(response, dict) else ''
                     transaction_obj.save()
                     
                     logger.info(f"Updated topup {transaction_obj.payment_id} status: {new_status}")
@@ -988,6 +999,8 @@ class TransactionStatusAPIView(TransactionEventManagerMixin, APIView):
                         wallet.current_balance = wallet_details['currentBalance']
                         wallet.save()
                         
+        except DTBServiceAPIError as e:
+            logger.error(f"Error refreshing status from gateway (API Error {e.status_code}): {e.message}")
         except Exception as e:
             logger.error(f"Error refreshing status from gateway: {e}")
     
@@ -1022,7 +1035,7 @@ class TransactionStatusAPIView(TransactionEventManagerMixin, APIView):
                     "bank_name": transaction_obj.bank_beneficiary.bank_name,
                     "nickname": transaction_obj.bank_beneficiary.nickname
                 } if transaction_obj.bank_beneficiary else None,
-                "error_info": transaction_obj.extra_info.get('error_description') if transaction_obj.extra_info else None
+                "error_info": transaction_obj.extra_info.get('error_description_from_refresh') if isinstance(transaction_obj.extra_info, dict) else None
             }
         
         else:  # topup_transaction

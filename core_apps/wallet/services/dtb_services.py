@@ -31,7 +31,7 @@ class DTBService:
             "password": self.PASSWORD
         }
         try:
-            response = self.session.post(url, json=payload, headers=self.headers, verify=False)
+            response = self.session.post(url, json=payload, headers=self.headers, verify=True)
             response.raise_for_status()
             data = response.json()
 
@@ -212,6 +212,18 @@ class DTBService:
         response = self.request_with_retries('POST', url, json=payload, headers=self.headers)
         return response.json()
         
+    def get_withdrawal_status(self, wallet_id, withdrawal_id):
+        """
+        Get the status of a specific withdrawal.
+        Note: This uses the top-ups endpoint as a workaround, assuming withdrawal IDs
+        are treated similarly to payment IDs for status checks.
+        """
+        # The endpoint for checking withdrawal status is the same as for topups,
+        # using the withdrawal_id as the payment_id in the URL.
+        url = f'{self.BASE_URL}/tenants/{self.TENANT_ID}/wallets/{wallet_id}/topups/{withdrawal_id}'
+        response = self.request_with_retries('GET', url, headers=self.headers)
+        return response.json()
+
     def get_withdrawal_fee(self, wallet_id, amount, withdrawal_type="KE_DTB_MPESA"):
         """
         Get the fee for a specific withdrawal amount and type

@@ -25,6 +25,7 @@ from ..services.dtb_services import (
 )
 from core_apps.users.utils import get_base64_from_s3
 from ..services.wallet_service import create_wallet_for_customer, WalletCreationError
+from core_apps.common.services.email_service import EmailService
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +72,13 @@ def handle_provider_exception(customer_profile, stage, error):
 	customer_profile.kyc_status = 'FAILED'
 	customer_profile.kyc_error_message = f"{stage} Error: {str(error)}"
 	customer_profile.save()
+	
+	# Send KYC review email to user
+	if customer_profile.user.email:
+		try:
+			EmailService.send_kyc_review_email(customer_profile.user)
+		except Exception as e:
+			logger.error(f"Failed to send KYC review email to {customer_profile.user.email}: {e}")
 	
 	return Response(
 		{
@@ -158,6 +166,14 @@ class FinalizeRegistrationAPIView(APIView):
 					customer_profile.kyc_failure_stage = 'Customer Registration'
 					customer_profile.kyc_error_message = error_message
 					customer_profile.save()
+
+					# Send KYC review email
+					if user.email:
+						try:
+							EmailService.send_kyc_review_email(user)
+						except Exception as e:
+							logger.error(f"Failed to send KYC review email to {user.email}: {e}")
+
 					return Response({
 						"message": "Registration failed",
 						"error": error_message
@@ -268,6 +284,13 @@ class FinalizeRegistrationAPIView(APIView):
 						"passed_checks": passed_checks
 					}, status=status.HTTP_200_OK)
 				else:
+					# Send KYC review email
+					if user.email:
+						try:
+							EmailService.send_kyc_review_email(user)
+						except Exception as e:
+							logger.error(f"Failed to send KYC review email to {user.email}: {e}")
+							
 					send_mail(
 						subject="Error: KYC RATIFICATION FAILED",
 						message=f"Failed to create wallet for customer ID {customer_profile.customer_id} as no allowed wallet type was found. Failed at {failed_checks}",
@@ -291,6 +314,14 @@ class FinalizeRegistrationAPIView(APIView):
 			customer_profile.kyc_failure_stage = 'Registration/KYC'
 			customer_profile.kyc_error_message = str(e)
 			customer_profile.save()
+
+			# Send KYC review email
+			if user.email:
+				try:
+					EmailService.send_kyc_review_email(user)
+				except Exception as email_exc:
+					logger.error(f"Failed to send KYC review email to {user.email}: {email_exc}")
+
 			return Response({
 				"message": "Registration failed",
 				"error": str(e)
@@ -320,6 +351,14 @@ class CreateCustomerWalletAPIView(APIView):
 		
 		try:
 			wallet = create_wallet_for_customer(customer_profile)
+			
+			# Send wallet creation success email
+			if user.email:
+				try:
+					EmailService.send_wallet_creation_success_email(user)
+				except Exception as e:
+					logger.error(f"Failed to send wallet creation success email to {user.email}: {e}")
+			
 			response_serializer = WalletResponseSerializer(wallet)
 			return Response({
 				"message": "Wallet created or already exists.",

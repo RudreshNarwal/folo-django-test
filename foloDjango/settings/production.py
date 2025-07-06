@@ -295,13 +295,16 @@ EMAIL_SUBJECT_PREFIX = env(
 
 # settings.py
 
-EMAIL_BACKEND = 'django_ses.SESBackend'
+EMAIL_BACKEND = "djcelery_email.backends.CeleryEmailBackend"
+CELERY_EMAIL_BACKEND = "django_ses.SESBackend"
+
 ADMINS = [("Kevin", "kevin@ubuntuonline.co.ke"), ("Rudresh", "rudresh@ubuntuonline.co.ke"),
           ]
 AWS_ACCESS_KEY_ID = env("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = env("AWS_SECRET_ACCESS_KEY")
 AWS_SES_REGION_NAME = 'af-south-1'
 AWS_SES_REGION_ENDPOINT = 'email.af-south-1.amazonaws.com'
+AWS_SES_AUTO_THROTTLE = 0.5  # Throttle sending rate for production
 EMAIL_USE_TLS = True
 DOMAIN = env("DOMAIN")
 

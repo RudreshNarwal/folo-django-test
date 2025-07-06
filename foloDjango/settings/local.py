@@ -45,6 +45,7 @@ THIRD_PARTY_APPS = [
 	"djcelery_email",
 	'rest_framework_simplejwt',
 	"rest_framework.authtoken",
+	"django_ses",
 ]
 
 LOCAL_APPS = [
@@ -236,10 +237,22 @@ CORS_ALLOW_CREDENTIALS = True
 
 AWS_ACCESS_KEY_ID = env("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = env("AWS_SECRET_ACCESS_KEY")
+AWS_SES_REGION_NAME = "af-south-1"  # Cape Town, Africa region
+AWS_SES_REGION_ENDPOINT = "email.af-south-1.amazonaws.com"
+
+# Configure SES as the email backend for better performance and HTML support
 EMAIL_BACKEND = "djcelery_email.backends.CeleryEmailBackend"
-EMAIL_HOST = env("EMAIL_HOST", default="mailhog")
-EMAIL_PORT = env("EMAIL_PORT")
-DEFAULT_FROM_EMAIL = "Folo Money Dev <rudresh@ubuntuonline.co.ke>"
+CELERY_EMAIL_BACKEND = "django_ses.SESBackend"
+
+# SES Configuration
+AWS_SES_AUTO_THROTTLE = 0.5  # Throttle sending rate
+AWS_SES_CONFIGURATION_SET = None  # Optional: set if you have a configuration set
+
+# Remove the old EMAIL_HOST settings as we're using SES
+# EMAIL_HOST = env("EMAIL_HOST", default="mailhog")
+# EMAIL_PORT = env("EMAIL_PORT")
+
+DEFAULT_FROM_EMAIL = "FoloMoney <noreply@folomoney.com>"  # Use a verified SES email
 DEFAULT_EMAIL_RECEIVERS = ["rudresh@ubuntuonline.co.ke", "kevin@ubuntuonline.co.ke", "rudresh.narwal20@gmail.com"]
 DOMAIN = env("DOMAIN")
 SITE_NAME = "FoloMoney"

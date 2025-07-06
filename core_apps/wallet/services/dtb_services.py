@@ -223,7 +223,7 @@ class DTBService:
         url = f'{self.BASE_URL}/tenants/{self.TENANT_ID}/wallets/{wallet_id}/topups/{withdrawal_id}'
         response = self.request_with_retries('GET', url, headers=self.headers)
         return response.json()
-
+        
     def get_withdrawal_fee(self, wallet_id, amount, withdrawal_type="KE_DTB_MPESA"):
         """
         Get the fee for a specific withdrawal amount and type

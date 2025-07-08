@@ -51,6 +51,8 @@ class AuthView(viewsets.ViewSet):
         else:
             # If user does not exist, create a new one and send OTP
             user = serializer.save()
+            user.country_code = country_code
+            user.save(update_fields=['country_code'])
             otp = user.send_otp()
             return Response({
                 "is_registered": user.email is not None and user.email.strip() != "",

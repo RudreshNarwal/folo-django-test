@@ -15,6 +15,7 @@ from core_apps.users.serializers.auth import VerifyOTPRequestSerializer
 from django.contrib.auth import get_user_model
 from rest_framework.generics import RetrieveUpdateAPIView
 from rest_framework.permissions import IsAuthenticated
+from ..utils import get_country_from_country_code
 
 from ..serializers.user import UserSerializer
 
@@ -38,10 +39,11 @@ class AuthView(viewsets.ViewSet):
         user = self.model.objects.filter(mobile=mobile).first()
 
         if user:
-            # If user exists, update country code if necessary and send OTP
+            # If user exists, update country code and country if necessary
             if user.country_code != country_code:
                 user.country_code = country_code
-                user.save(update_fields=['country_code'])
+                user.country = get_country_from_country_code(country_code)
+                user.save(update_fields=['country_code', 'country'])
 
             otp = user.send_otp()
             return Response({
@@ -52,7 +54,8 @@ class AuthView(viewsets.ViewSet):
             # If user does not exist, create a new one and send OTP
             user = serializer.save()
             user.country_code = country_code
-            user.save(update_fields=['country_code'])
+            user.country = get_country_from_country_code(country_code)
+            user.save(update_fields=['country_code', 'country'])
             otp = user.send_otp()
             return Response({
                 "is_registered": user.email is not None and user.email.strip() != "",

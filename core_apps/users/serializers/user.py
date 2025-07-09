@@ -78,10 +78,10 @@ class DocumentSerializer(serializers.ModelSerializer):
 		document, created = Document.objects.update_or_create(
 			user=user,
 			document_type=validated_data['document_type'],
-			document_number=validated_data.get('document_number', None),
 			defaults={
 				's3_key': s3_key,
 				'media_type': media_type,
+				'document_number': validated_data.get('document_number', None),
 			}
 		)
 		return document

@@ -93,7 +93,7 @@ class AddressSerializer(serializers.ModelSerializer):
 	class Meta:
 		model = Address
 		fields = [
-			'address_type', 'city', 'country', 'line1', 'line2', 'state', 'code'
+			'address_type', 'city', 'country', 'line1', 'line2', 'state', 'code', 'country_master', 'state_master'
 		]
 
 
@@ -116,7 +116,7 @@ class UserSerializer(serializers.ModelSerializer):
 			"pkid", "id", "first_name", "middle_name", "last_name", "dob", "mobile", 'is_mobile_verified', "email",
 			"gender", "nation_id", "is_email_verified", "country_code", "marital_status", "country", "city", "title",
 			"documents", "address", "district_of_birth", "employment_status", "expected_monthly_payments",
-			"acting_as_intermediary", "occupation_id", "account_purpose", "account_purpose_other", "source_of_funds"
+			"acting_as_intermediary", "occupation", "account_purpose", "account_purpose_other", "source_of_funds"
 		]
 	
 	def validate_mobile(self, value):

@@ -443,6 +443,7 @@ class TopUpMoneyAPIView(APIView):
 
 
 class TopUpWebhookAPIView(APIView):
+	permission_classes = []  # Allow unauthenticated access for webhook callbacks
 	def post(self, request):
 		data = request.data
 		payment_id = data.get('paymentId')
@@ -670,6 +671,7 @@ class WalletMovementCallbackAPIView(APIView):
 	Webhook endpoint for wallet movement notifications.
 	Receives callbacks when money is credited to or debited from a wallet.
 	"""
+	permission_classes = []  # Allow unauthenticated access for webhook callbacks
 	
 	# Mapping DTB transaction types to our internal transaction types
 	DTB_TO_INTERNAL_TYPE_MAPPING = {
@@ -896,6 +898,7 @@ class ManualRatificationWebhookAPIView(APIView):
 	Webhook endpoint for manual ratification notifications from DTB.
 	Handles callbacks when DTB team performs manual ratification for customers.
 	"""
+	permission_classes = []  # Allow unauthenticated access for webhook callbacks
 	
 	def post(self, request):
 		# Print webhook hit confirmation (for Docker logs)
@@ -956,16 +959,15 @@ class ManualRatificationWebhookAPIView(APIView):
 			import json
 			try:
 				ratify_results = json.loads(ratify_result_data) if isinstance(ratify_result_data, str) else ratify_result_data
-				print(f"[MANUAL RATIFICATION WEBHOOK] Parsed ratification results: {ratify_results}")
+				logger.info(f"[MANUAL RATIFICATION WEBHOOK] Parsed ratification results: {ratify_results}")
 			except (json.JSONDecodeError, TypeError) as e:
-				print(f"[MANUAL RATIFICATION WEBHOOK] ERROR: Failed to parse ratifyResultData: {e}")
 				logger.error(f"Failed to parse ratifyResultData: {e}")
 				return Response({"error": "Invalid ratification data format"}, status=status.HTTP_400_BAD_REQUEST)
 			
 			# Check if manual ratification passed
 			manual_ratify_check = ratify_results.get('manualRatify', {})
 			manual_ratify_passed = manual_ratify_check.get('passed', False)
-			print(f"[MANUAL RATIFICATION WEBHOOK] Manual ratification result: {'PASSED' if manual_ratify_passed else 'FAILED'}")
+			logger.info(f"[MANUAL RATIFICATION WEBHOOK] Manual ratification result: {'PASSED' if manual_ratify_passed else 'FAILED'}")
 			
 			# Store the old status for comparison
 			old_status = customer_profile.kyc_status
@@ -1017,14 +1019,12 @@ class ManualRatificationWebhookAPIView(APIView):
 			
 			customer_profile.save()
 			
-			print(f"[MANUAL RATIFICATION WEBHOOK] Customer profile updated - Status changed from '{old_status}' to '{customer_profile.kyc_status}'")
-			
 			# Log the status change
-			logger.info(f"Manual ratification processed for customer {customer_profile.customer_id}: {old_status} -> {customer_profile.kyc_status}")
+			logger.info(f"[MANUAL RATIFICATION WEBHOOK] Manual ratification processed for customer {customer_profile.customer_id}: {old_status} -> {customer_profile.kyc_status}")
 			
 			# Send notification emails and handle wallet creation
 			if customer_profile.kyc_status == 'APPROVED' and old_status != 'APPROVED':
-				print(f"[MANUAL RATIFICATION WEBHOOK] Customer approved - Sending success notification and attempting wallet creation")
+				logger.info(f"[MANUAL RATIFICATION WEBHOOK] Customer approved - Sending success notification and attempting wallet creation")
 				
 				# Send success notification
 				send_mail(
@@ -1037,13 +1037,11 @@ class ManualRatificationWebhookAPIView(APIView):
 				
 				# Auto-create wallet
 				try:
-					print(f"[MANUAL RATIFICATION WEBHOOK] Attempting to auto-create wallet for customer {customer_profile.customer_id}")
-					logger.info(f"Attempting to auto-create wallet for manually ratified customer {customer_profile.customer_id}")
+					logger.info(f"[MANUAL RATIFICATION WEBHOOK] Attempting to auto-create wallet for manually ratified customer {customer_profile.customer_id}")
 					wallet = create_wallet_for_customer(customer_profile)
-					print(f"[MANUAL RATIFICATION WEBHOOK] Wallet created successfully: {wallet.wallet_id}")
+					logger.info(f"[MANUAL RATIFICATION WEBHOOK] Wallet created successfully: {wallet.wallet_id}")
 				except WalletCreationError as e:
-					print(f"[MANUAL RATIFICATION WEBHOOK] ERROR: Wallet creation failed - {e}")
-					logger.error(f"Auto-creation of wallet failed after manual ratification for customer {customer_profile.customer_id}: {e}")
+					logger.error(f"[MANUAL RATIFICATION WEBHOOK] Auto-creation of wallet failed after manual ratification for customer {customer_profile.customer_id}: {e}")
 					# Optionally send another email to admins about the failure
 					send_mail(
 						subject="URGENT: Wallet Auto-Creation Failed After Manual Ratification",

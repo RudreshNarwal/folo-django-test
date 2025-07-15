@@ -372,6 +372,7 @@ class MpesaWithdrawalWebhookAPIView(TransactionEventManagerMixin, APIView):
     Webhook endpoint for MPESA withdrawal status updates.
     This should be configured as the callback URL in the MPESA withdrawal request.
     """
+    permission_classes = []  # Allow unauthenticated access for webhook callbacks
     def post(self, request):
         data = request.data
         # Handle both old format (withdrawalId) and new format (paymentId)

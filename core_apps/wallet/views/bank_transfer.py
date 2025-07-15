@@ -191,6 +191,7 @@ class BankTransferWebhookAPIView(APIView):
     Webhook endpoint for bank transfer status updates.
     This handles callbacks for both PesaLink and EFT transfers.
     """
+    permission_classes = []  # Allow unauthenticated access for webhook callbacks
     def post(self, request):
         data = request.data
         external_unique_id = data.get('externalUniqueId')

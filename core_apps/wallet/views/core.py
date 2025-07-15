@@ -898,7 +898,19 @@ class ManualRatificationWebhookAPIView(APIView):
 	"""
 	
 	def post(self, request):
+		# Print webhook hit confirmation (for Docker logs)
+		print(f"[MANUAL RATIFICATION WEBHOOK] Webhook hit at {timezone.now()}")
+		print(f"[MANUAL RATIFICATION WEBHOOK] Request method: {request.method}")
+		print(f"[MANUAL RATIFICATION WEBHOOK] Request headers: {dict(request.headers)}")
+		
+		# Also use logger for Django logging system
+		logger.info(f"[MANUAL RATIFICATION WEBHOOK] Webhook hit at {timezone.now()}")
+		logger.info(f"[MANUAL RATIFICATION WEBHOOK] Request method: {request.method}")
+		
 		data = request.data
+		print(f"[MANUAL RATIFICATION WEBHOOK] Complete incoming data: {data}")
+		logger.info(f"[MANUAL RATIFICATION WEBHOOK] Complete incoming data: {data}")
+		
 		event_type = data.get('eventType')
 		tenant_id = data.get('tenantId')
 		created = data.get('created')
@@ -916,6 +928,8 @@ class ManualRatificationWebhookAPIView(APIView):
 		instigator = data.get('instigator', {})
 		instigator_identity = instigator.get('identity')
 		
+		print(f"[MANUAL RATIFICATION WEBHOOK] Extracted data - Event: {event_type}, Entity ID: {associated_entity_id}, Entity Type: {associated_entity_type}, Instigator: {instigator_identity}")
+		
 		logger.info(f"Manual ratification webhook received: eventType={event_type}, entityId={associated_entity_id}, entityType={associated_entity_type}")
 		
 		try:
@@ -932,7 +946,9 @@ class ManualRatificationWebhookAPIView(APIView):
 			# Find the customer profile by customer_id
 			try:
 				customer_profile = CustomerProfile.objects.get(customer_id=associated_entity_id)
+				print(f"[MANUAL RATIFICATION WEBHOOK] Customer found: {customer_profile.customer_id} - Current KYC Status: {customer_profile.kyc_status}")
 			except CustomerProfile.DoesNotExist:
+				print(f"[MANUAL RATIFICATION WEBHOOK] ERROR: Customer not found for ID: {associated_entity_id}")
 				logger.error(f"Manual ratification webhook received for unknown customer: {associated_entity_id}")
 				return Response({"error": "Customer not found"}, status=status.HTTP_404_NOT_FOUND)
 			
@@ -940,13 +956,16 @@ class ManualRatificationWebhookAPIView(APIView):
 			import json
 			try:
 				ratify_results = json.loads(ratify_result_data) if isinstance(ratify_result_data, str) else ratify_result_data
+				print(f"[MANUAL RATIFICATION WEBHOOK] Parsed ratification results: {ratify_results}")
 			except (json.JSONDecodeError, TypeError) as e:
+				print(f"[MANUAL RATIFICATION WEBHOOK] ERROR: Failed to parse ratifyResultData: {e}")
 				logger.error(f"Failed to parse ratifyResultData: {e}")
 				return Response({"error": "Invalid ratification data format"}, status=status.HTTP_400_BAD_REQUEST)
 			
 			# Check if manual ratification passed
 			manual_ratify_check = ratify_results.get('manualRatify', {})
 			manual_ratify_passed = manual_ratify_check.get('passed', False)
+			print(f"[MANUAL RATIFICATION WEBHOOK] Manual ratification result: {'PASSED' if manual_ratify_passed else 'FAILED'}")
 			
 			# Store the old status for comparison
 			old_status = customer_profile.kyc_status
@@ -998,11 +1017,15 @@ class ManualRatificationWebhookAPIView(APIView):
 			
 			customer_profile.save()
 			
+			print(f"[MANUAL RATIFICATION WEBHOOK] Customer profile updated - Status changed from '{old_status}' to '{customer_profile.kyc_status}'")
+			
 			# Log the status change
 			logger.info(f"Manual ratification processed for customer {customer_profile.customer_id}: {old_status} -> {customer_profile.kyc_status}")
 			
 			# Send notification emails and handle wallet creation
 			if customer_profile.kyc_status == 'APPROVED' and old_status != 'APPROVED':
+				print(f"[MANUAL RATIFICATION WEBHOOK] Customer approved - Sending success notification and attempting wallet creation")
+				
 				# Send success notification
 				send_mail(
 					subject="Manual KYC Ratification Approved - Customer Ready for Wallet Creation",
@@ -1014,9 +1037,12 @@ class ManualRatificationWebhookAPIView(APIView):
 				
 				# Auto-create wallet
 				try:
+					print(f"[MANUAL RATIFICATION WEBHOOK] Attempting to auto-create wallet for customer {customer_profile.customer_id}")
 					logger.info(f"Attempting to auto-create wallet for manually ratified customer {customer_profile.customer_id}")
-					create_wallet_for_customer(customer_profile)
+					wallet = create_wallet_for_customer(customer_profile)
+					print(f"[MANUAL RATIFICATION WEBHOOK] Wallet created successfully: {wallet.wallet_id}")
 				except WalletCreationError as e:
+					print(f"[MANUAL RATIFICATION WEBHOOK] ERROR: Wallet creation failed - {e}")
 					logger.error(f"Auto-creation of wallet failed after manual ratification for customer {customer_profile.customer_id}: {e}")
 					# Optionally send another email to admins about the failure
 					send_mail(
@@ -1027,6 +1053,8 @@ class ManualRatificationWebhookAPIView(APIView):
 						fail_silently=False,
 					)
 			elif customer_profile.kyc_status == 'FAILED':
+				print(f"[MANUAL RATIFICATION WEBHOOK] Customer failed ratification - Sending failure notification")
+				
 				# Send failure notification
 				send_mail(
 					subject="Manual KYC Ratification Failed - Customer Requires Further Review",
@@ -1036,6 +1064,8 @@ class ManualRatificationWebhookAPIView(APIView):
 					fail_silently=False,
 				)
 			
+			print(f"[MANUAL RATIFICATION WEBHOOK] Processing completed successfully - Final status: {customer_profile.kyc_status}")
+			
 			return Response({
 				"message": "Manual ratification webhook processed successfully",
 				"customer_id": customer_profile.customer_id,
@@ -1044,5 +1074,6 @@ class ManualRatificationWebhookAPIView(APIView):
 			}, status=status.HTTP_200_OK)
 		
 		except Exception as e:
+			print(f"[MANUAL RATIFICATION WEBHOOK] ERROR: Exception occurred during processing - {e}")
 			logger.error(f"Error processing manual ratification webhook: {e}")
 			return Response({"error": "An unexpected error occurred"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

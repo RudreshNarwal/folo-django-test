@@ -29,7 +29,7 @@ class CustomerProfile(models.Model):
 	
 	user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='customer_profile')
 	provider_name = models.CharField(max_length=20, choices=PROVIDER_CHOICES, default='DTB')
-	customer_id = models.IntegerField(null=True, blank=True)
+	customer_id = models.IntegerField(null=True, blank=True, unique=True)
 	external_unique_id = models.UUIDField(null=True, blank=True)
 	kyc_status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
 	kyc_failure_stage = models.CharField(max_length=100, null=True, blank=True)

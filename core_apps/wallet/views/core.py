@@ -948,30 +948,12 @@ class ManualRatificationWebhookAPIView(APIView):
 			
 			# Find the customer profile by customer_id
 			try:
-				customer_profiles = CustomerProfile.objects.filter(customer_id=associated_entity_id)
-				
-				if customer_profiles.count() == 0:
-					print(f"[MANUAL RATIFICATION WEBHOOK] ERROR: Customer not found for ID: {associated_entity_id}")
-					logger.error(f"Manual ratification webhook received for unknown customer: {associated_entity_id}")
-					return Response({"error": "Customer not found"}, status=status.HTTP_404_NOT_FOUND)
-				elif customer_profiles.count() > 1:
-					print(f"[MANUAL RATIFICATION WEBHOOK] WARNING: Multiple CustomerProfile records found for customer_id {associated_entity_id}. Count: {customer_profiles.count()}")
-					logger.warning(f"Multiple CustomerProfile records found for customer_id {associated_entity_id}. Count: {customer_profiles.count()}. Using the first one.")
-					
-					# Log details of all duplicate records for investigation
-					for i, profile in enumerate(customer_profiles):
-						logger.warning(f"Duplicate {i+1}: CustomerProfile ID={profile.id}, User ID={profile.user.id}, User={profile.user.get_full_name()}, KYC Status={profile.kyc_status}")
-					
-					customer_profile = customer_profiles.first()
-				else:
-					customer_profile = customer_profiles.first()
-				
+				customer_profile = CustomerProfile.objects.get(customer_id=associated_entity_id)
 				print(f"[MANUAL RATIFICATION WEBHOOK] Customer found: {customer_profile.customer_id} - Current KYC Status: {customer_profile.kyc_status}")
-				
-			except Exception as e:
-				print(f"[MANUAL RATIFICATION WEBHOOK] ERROR: Exception while finding customer: {e}")
-				logger.error(f"Exception while finding customer profile for ID {associated_entity_id}: {e}")
-				return Response({"error": "Error finding customer profile"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+			except CustomerProfile.DoesNotExist:
+				print(f"[MANUAL RATIFICATION WEBHOOK] ERROR: Customer not found for ID: {associated_entity_id}")
+				logger.error(f"Manual ratification webhook received for unknown customer: {associated_entity_id}")
+				return Response({"error": "Customer not found"}, status=status.HTTP_404_NOT_FOUND)
 			
 			# Parse the ratification result data
 			import json
@@ -1045,9 +1027,10 @@ class ManualRatificationWebhookAPIView(APIView):
 				logger.info(f"[MANUAL RATIFICATION WEBHOOK] Customer approved - Sending success notification and attempting wallet creation")
 				
 				# Send success notification
+				user_full_name = f"{customer_profile.user.first_name} {customer_profile.user.last_name}".strip()
 				send_mail(
 					subject="Manual KYC Ratification Approved - Customer Ready for Wallet Creation",
-					message=f"Customer {customer_profile.customer_id} ({customer_profile.user.get_full_name()}) has been manually approved for KYC by {instigator_identity}. They can now create a wallet.",
+					message=f"Customer {customer_profile.customer_id} ({user_full_name}) has been manually approved for KYC by {instigator_identity}. They can now create a wallet.",
 					from_email=settings.DEFAULT_FROM_EMAIL,
 					recipient_list=settings.DEFAULT_EMAIL_RECEIVERS,
 					fail_silently=False,
@@ -1061,9 +1044,10 @@ class ManualRatificationWebhookAPIView(APIView):
 				except WalletCreationError as e:
 					logger.error(f"[MANUAL RATIFICATION WEBHOOK] Auto-creation of wallet failed after manual ratification for customer {customer_profile.customer_id}: {e}")
 					# Optionally send another email to admins about the failure
+					user_full_name = f"{customer_profile.user.first_name} {customer_profile.user.last_name}".strip()
 					send_mail(
 						subject="URGENT: Wallet Auto-Creation Failed After Manual Ratification",
-						message=f"Failed to auto-create wallet for customer {customer_profile.customer_id} ({customer_profile.user.get_full_name()}) after manual KYC approval. Error: {str(e)}",
+						message=f"Failed to auto-create wallet for customer {customer_profile.customer_id} ({user_full_name}) after manual KYC approval. Error: {str(e)}",
 						from_email=settings.DEFAULT_FROM_EMAIL,
 						recipient_list=settings.DEFAULT_EMAIL_RECEIVERS,
 						fail_silently=False,
@@ -1072,9 +1056,10 @@ class ManualRatificationWebhookAPIView(APIView):
 				print(f"[MANUAL RATIFICATION WEBHOOK] Customer failed ratification - Sending failure notification")
 				
 				# Send failure notification
+				user_full_name = f"{customer_profile.user.first_name} {customer_profile.user.last_name}".strip()
 				send_mail(
 					subject="Manual KYC Ratification Failed - Customer Requires Further Review",
-					message=f"Customer {customer_profile.customer_id} ({customer_profile.user.get_full_name()}) has failed manual KYC ratification by {instigator_identity}. Error: {customer_profile.kyc_error_message}",
+					message=f"Customer {customer_profile.customer_id} ({user_full_name}) has failed manual KYC ratification by {instigator_identity}. Error: {customer_profile.kyc_error_message}",
 					from_email=settings.DEFAULT_FROM_EMAIL,
 					recipient_list=settings.DEFAULT_EMAIL_RECEIVERS,
 					fail_silently=False,

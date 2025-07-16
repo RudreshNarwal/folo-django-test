@@ -948,12 +948,30 @@ class ManualRatificationWebhookAPIView(APIView):
 			
 			# Find the customer profile by customer_id
 			try:
-				customer_profile = CustomerProfile.objects.get(customer_id=associated_entity_id)
+				customer_profiles = CustomerProfile.objects.filter(customer_id=associated_entity_id)
+				
+				if customer_profiles.count() == 0:
+					print(f"[MANUAL RATIFICATION WEBHOOK] ERROR: Customer not found for ID: {associated_entity_id}")
+					logger.error(f"Manual ratification webhook received for unknown customer: {associated_entity_id}")
+					return Response({"error": "Customer not found"}, status=status.HTTP_404_NOT_FOUND)
+				elif customer_profiles.count() > 1:
+					print(f"[MANUAL RATIFICATION WEBHOOK] WARNING: Multiple CustomerProfile records found for customer_id {associated_entity_id}. Count: {customer_profiles.count()}")
+					logger.warning(f"Multiple CustomerProfile records found for customer_id {associated_entity_id}. Count: {customer_profiles.count()}. Using the first one.")
+					
+					# Log details of all duplicate records for investigation
+					for i, profile in enumerate(customer_profiles):
+						logger.warning(f"Duplicate {i+1}: CustomerProfile ID={profile.id}, User ID={profile.user.id}, User={profile.user.get_full_name()}, KYC Status={profile.kyc_status}")
+					
+					customer_profile = customer_profiles.first()
+				else:
+					customer_profile = customer_profiles.first()
+				
 				print(f"[MANUAL RATIFICATION WEBHOOK] Customer found: {customer_profile.customer_id} - Current KYC Status: {customer_profile.kyc_status}")
-			except CustomerProfile.DoesNotExist:
-				print(f"[MANUAL RATIFICATION WEBHOOK] ERROR: Customer not found for ID: {associated_entity_id}")
-				logger.error(f"Manual ratification webhook received for unknown customer: {associated_entity_id}")
-				return Response({"error": "Customer not found"}, status=status.HTTP_404_NOT_FOUND)
+				
+			except Exception as e:
+				print(f"[MANUAL RATIFICATION WEBHOOK] ERROR: Exception while finding customer: {e}")
+				logger.error(f"Exception while finding customer profile for ID {associated_entity_id}: {e}")
+				return Response({"error": "Error finding customer profile"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 			
 			# Parse the ratification result data
 			import json

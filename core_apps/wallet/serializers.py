@@ -91,7 +91,7 @@ class TransactionSerializer(serializers.ModelSerializer):
 			'transaction_id', 'transaction_type', 'amount', 'fee', 'currency',
 			'status', 'description', 'created_at', 'from_wallet_id',
 			'to_wallet_id', 'deliver_to_phone', 'gateway_transaction_id',
-			'contact_name', 'contact_phone', 'bank_beneficiary_info',
+			'contact_name', 'contact_phone', 'bank_beneficiary_info', 'reference',
 			'transaction_direction', 'other_party_info'
 		]
 		read_only_fields = fields

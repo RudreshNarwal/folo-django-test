@@ -76,7 +76,7 @@ class WalletToBankTransferAPIView(APIView):
 
         # Prepare payload based on transfer type
         dtb_service = DTBService()
-        callback_url = getattr(settings, 'BANK_TRANSFER_CALLBACK_URL', 'https://webhook.site/b29c3860-7032-41ca-8c88-753f2f5655da')
+        callback_url = settings.BANK_TRANSFER_CALLBACK_URL
 
         if transfer_type == 'PESALINK':
             payload = {

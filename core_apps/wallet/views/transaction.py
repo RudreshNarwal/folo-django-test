@@ -256,8 +256,7 @@ class WalletToMpesaTransferAPIView(TransactionEventManagerMixin, APIView):
         )
 
         # Prepare payload for DTB service
-        # callback_url = settings.WALLET_WITHDRAWAL_CALLBACK_URL
-        callback_url = 'https://webhook.site/b29c3860-7032-41ca-8c88-753f2f5655da'
+        callback_url = settings.WALLET_WITHDRAWAL_CALLBACK_URL
         payload = {
             "deliverToPhone": phone_number,
             "reference": reference,

@@ -1,30 +1,39 @@
-import logging
 import uuid
-
+import logging
 from django.conf import settings
-from django.core.mail import send_mail
+from django.utils import timezone
 
 from ..models import Wallet, WalletType, CustomerProfile
-from .dtb_services import DTBService, DTBServiceAuthenticationError, DTBServiceAPIError, DTBServiceError
+from .dtb_services import DTBService, DTBServiceError
+from core_apps.common.services.email_service import EmailService
 
 logger = logging.getLogger(__name__)
 
+
 class WalletCreationError(Exception):
-    """Custom exception for wallet creation failures."""
+    """Exception raised when wallet creation fails."""
     pass
+
 
 def create_wallet_for_customer(customer_profile: CustomerProfile):
     """
-    Creates a wallet for a customer profile, handling all interactions with the DTB service.
+    Creates a wallet for a customer profile.
+    
+    This function handles the complete wallet creation process:
+    1. Validates customer eligibility (KYC approved, registered with DTB)
+    2. Fetches available wallet types from DTB
+    3. Creates wallet via DTB API
+    4. Creates local wallet record
+    5. Sends success notification email
     
     Args:
-        customer_profile: The CustomerProfile instance for which to create a wallet.
-
+        customer_profile: CustomerProfile instance
+        
     Returns:
-        The created Wallet instance.
-
+        Wallet: Created wallet instance
+        
     Raises:
-        WalletCreationError: If the wallet creation fails for any reason.
+        WalletCreationError: If wallet creation fails
     """
     user = customer_profile.user
     
@@ -63,7 +72,8 @@ def create_wallet_for_customer(customer_profile: CustomerProfile):
             "description": "Folo Money Customer Wallet",
             "walletTypeId": selected_wallet_type_id,
             "cardType": "virtual",
-            "configuration": []
+            "configuration": [],
+            "movementCallbackUrl": settings.WALLET_MOVEMENT_CALLBACK_URL
         }
 
         # 5. Create Wallet via DTB API
@@ -109,9 +119,14 @@ def create_wallet_for_customer(customer_profile: CustomerProfile):
             customer_profile.save(update_fields=['kyc_status'])
             logger.info(f"Updated customer profile {customer_profile.id} status to APPROVED.")
 
+        # 9. Send wallet creation success email
+        if created:
+            EmailService.send_wallet_creation_success_email(user)
+            logger.info(f"Sent wallet creation success email to {user.email}")
+
         return wallet
 
-    except (DTBServiceError, DTBServiceAPIError, DTBServiceAuthenticationError) as e:
+    except DTBServiceError as e:
         logger.error(f"DTB Service error during wallet creation for customer {customer_profile.customer_id}: {e}")
         raise WalletCreationError(f"DTB Service Error: {e}")
     except Exception as e:

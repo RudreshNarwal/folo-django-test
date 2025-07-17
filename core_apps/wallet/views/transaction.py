@@ -30,6 +30,7 @@ from ..services.dtb_services import (
     DTBServiceAuthenticationError,
     DTBServiceAPIError,
 )
+from ..tasks import schedule_transaction_timeout_check
 
 logger = logging.getLogger(__name__)
 
@@ -134,6 +135,14 @@ class WalletToWalletTransferAPIView(APIView):
             user=request.user,
             customer=from_wallet.customer,
             description=description
+        )
+        
+        # Schedule timeout check for this transaction (5 minutes)
+        # Note: Wallet-to-wallet transfers are usually immediate, but we schedule this for consistency
+        schedule_transaction_timeout_check.delay(
+            str(transaction.transaction_id),
+            'wallet_transaction',
+            5  # 5 minutes timeout
         )
         
         # Prepare payload for DTB service
@@ -287,6 +296,13 @@ class WalletToMpesaTransferAPIView(TransactionEventManagerMixin, APIView):
                 transaction.extra_info['initiation_response'] = response.get('extraInfo')
                 
                 transaction.save()
+
+                # Schedule timeout check for this transaction (5 minutes)
+                schedule_transaction_timeout_check.delay(
+                    str(transaction.transaction_id),
+                    'wallet_transaction',
+                    5  # 5 minutes timeout
+                )
 
                 # Update wallet balance
                 wallet_details = dtb_service.get_wallet_details(from_wallet_id)
@@ -627,30 +643,49 @@ class ComprehensiveWalletHistoryAPIView(generics.ListAPIView):
     def get_queryset(self):
         user = self.request.user
         
-        # Get user's active wallet
+        # Get the user's active wallet
         try:
             wallet = Wallet.objects.get(user=user, status='ACTIVE')
         except Wallet.DoesNotExist:
-            return []
+            # Return an empty queryset if no active wallet is found
+            return Transaction.objects.none()
         
-        # Get all Transfer transactions where user's wallet is involved
-        transfer_transactions = Transaction.objects.filter(
-            Q(user=user) |  # Transactions initiated by user
-            Q(from_wallet=wallet) |  # Outgoing from user's wallet
-            Q(to_wallet=wallet)  # Incoming to user's wallet
-        ).distinct()
+        # Get all Transfer transactions where the user's wallet was the sender or receiver,
+        # then order them by the creation date in descending order.
+        queryset = Transaction.objects.filter(
+            Q(from_wallet=wallet) | Q(to_wallet=wallet)
+        ).distinct().order_by('-created_at')
         
-        # Get all TopUp transactions for user's wallet
-        topup_transactions = TopUpTransaction.objects.filter(wallet=wallet)
+        return queryset
+
+    
+    # def get_queryset(self):
+    #     user = self.request.user
         
-        # Combine and sort by created_at
-        combined_transactions = sorted(
-            chain(transfer_transactions, topup_transactions),
-            key=attrgetter('created_at'),
-            reverse=True
-        )
+    #     # Get user's active wallet
+    #     try:
+    #         wallet = Wallet.objects.get(user=user, status='ACTIVE')
+    #     except Wallet.DoesNotExist:
+    #         return []
         
-        return combined_transactions
+    #     # Get all Transfer transactions where user's wallet is involved
+    #     transfer_transactions = Transaction.objects.filter(
+    #         Q(user=user) |  # Transactions initiated by user
+    #         Q(from_wallet=wallet) |  # Outgoing from user's wallet
+    #         Q(to_wallet=wallet)  # Incoming to user's wallet
+    #     ).distinct()
+        
+    #     # Get all TopUp transactions for user's wallet
+    #     topup_transactions = TopUpTransaction.objects.filter(wallet=wallet)
+        
+    #     # Combine and sort by created_at
+    #     combined_transactions = sorted(
+    #         chain(transfer_transactions, topup_transactions),
+    #         key=attrgetter('created_at'),
+    #         reverse=True
+    #     )
+        
+    #     return combined_transactions
     
     def list(self, request, *args, **kwargs):
         queryset = self.get_queryset()

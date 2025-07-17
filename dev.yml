@@ -33,6 +33,17 @@ services:
         networks:
             - reverseproxy_nw
 
+    celery_beat:
+        <<: *api
+        image: folo_money_celery_beat
+        command: /start-celerybeat
+        volumes:
+            - celery_beat_data:/data
+        networks:
+            - reverseproxy_nw
+        depends_on:
+            - redis
+
     flower:
         <<: *api
         image: folo_money_flower
@@ -54,3 +65,4 @@ volumes:
     dev_postgres_data: {}
     dev_postgres_data_backups: {}
     flower_data: {}
+    celery_beat_data: {}

@@ -312,4 +312,13 @@ TWILIO_PHONE_NUMBER = env("TWILIO_PHONE_NUMBER")
 
 FERNET_KEY = env("FERNET_KEY")
 
+# Celery Beat Configuration
+CELERY_BEAT_SCHEDULE = {
+    'cleanup-expired-transactions': {
+        'task': 'core_apps.wallet.tasks.cleanup_expired_transactions',
+        'schedule': 3600.0,  # Run every hour (3600 seconds)
+    },
+}
+CELERY_TIMEZONE = 'UTC'
+
 WEBHOOK_PUBLIC_KEY = env("WEBHOOK_PUBLIC_KEY")

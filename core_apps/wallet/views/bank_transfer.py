@@ -20,6 +20,7 @@ from ..services.dtb_services import (
     DTBServiceAuthenticationError,
     DTBServiceAPIError,
 )
+from ..tasks import schedule_transaction_timeout_check
 
 logger = logging.getLogger(__name__)
 
@@ -126,6 +127,13 @@ class WalletToBankTransferAPIView(APIView):
                 transaction.fee = response.get('fee', 0)
                 transaction.extra_info = response.get('extraInfo')
                 transaction.save()
+
+                # Schedule timeout check for this transaction (5 minutes)
+                schedule_transaction_timeout_check.delay(
+                    str(transaction.transaction_id),
+                    'wallet_transaction',
+                    5  # 5 minutes timeout
+                )
 
                 # Update wallet balance
                 wallet_details = dtb_service.get_wallet_details(from_wallet.wallet_id)

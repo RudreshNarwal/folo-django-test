@@ -26,6 +26,7 @@ from ..services.dtb_services import (
 from core_apps.users.utils import get_base64_from_s3
 from ..services.wallet_service import create_wallet_for_customer, WalletCreationError
 from core_apps.common.services.email_service import EmailService
+from ..tasks import schedule_transaction_timeout_check
 
 logger = logging.getLogger(__name__)
 
@@ -424,6 +425,13 @@ class TopUpMoneyAPIView(APIView):
 				fee=response['fee'],
 				wallet=wallet,
 				customer=user.customer_profile,
+			)
+			
+			# Schedule timeout check for this top-up transaction (5 minutes)
+			schedule_transaction_timeout_check.delay(
+				str(external_unique_id),
+				'topup_transaction',
+				5  # 5 minutes timeout
 			)
 			return Response({
 				"message": "Top-up initiated successfully.",

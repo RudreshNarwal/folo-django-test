@@ -140,6 +140,7 @@ class TopUpTransaction(models.Model):
 		('PENDING', 'Pending'),
 		('SUCCESSFUL', 'Successful'),
 		('ERROR_PERM', 'Error Permanent'),
+		('EXPIRED', 'Expired'),  # Added for timeout handling
 	]
 	
 	payment_id = models.BigIntegerField(unique=True, help_text="Unique payment ID from DTB.")

@@ -30,6 +30,7 @@ from ..services.dtb_services import (
     DTBServiceAuthenticationError,
     DTBServiceAPIError,
 )
+from ..tasks import schedule_transaction_timeout_check
 
 logger = logging.getLogger(__name__)
 
@@ -134,6 +135,14 @@ class WalletToWalletTransferAPIView(APIView):
             user=request.user,
             customer=from_wallet.customer,
             description=description
+        )
+        
+        # Schedule timeout check for this transaction (5 minutes)
+        # Note: Wallet-to-wallet transfers are usually immediate, but we schedule this for consistency
+        schedule_transaction_timeout_check.delay(
+            str(transaction.transaction_id),
+            'wallet_transaction',
+            5  # 5 minutes timeout
         )
         
         # Prepare payload for DTB service
@@ -287,6 +296,13 @@ class WalletToMpesaTransferAPIView(TransactionEventManagerMixin, APIView):
                 transaction.extra_info['initiation_response'] = response.get('extraInfo')
                 
                 transaction.save()
+
+                # Schedule timeout check for this transaction (5 minutes)
+                schedule_transaction_timeout_check.delay(
+                    str(transaction.transaction_id),
+                    'wallet_transaction',
+                    5  # 5 minutes timeout
+                )
 
                 # Update wallet balance
                 wallet_details = dtb_service.get_wallet_details(from_wallet_id)

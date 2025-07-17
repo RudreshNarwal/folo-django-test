@@ -1,0 +1,7 @@
+#!/bin/bash
+
+set -o errexit
+set -o nounset
+
+echo "Starting Celery Beat (Local)..."
+celery -A foloDjango beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler 

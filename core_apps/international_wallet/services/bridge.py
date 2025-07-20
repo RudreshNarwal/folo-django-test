@@ -497,6 +497,22 @@ class BridgeAPIService:
             logger.error(f"Failed to request total balances for all wallets: {e}")
             raise
 
+    def wallet_history(self, wallet_data) -> dict:
+        """
+        """
+        logger.info("Attempting to request wallet history for customer.")
+        try:
+            response = self._make_request(
+                method="GET",
+                endpoint=f"/v0/wallets/{wallet_data['wallet_address']}/history",
+                include_idempotency_key=False
+            )
+            logger.info("Successfully requested wallet history for customer.")
+            return response
+        except (BridgeAPIError, requests.exceptions.RequestException) as e:
+            logger.error(f"Failed to request wallet history for customer: {e}")
+            raise
+
     def external_account(self, external_account_data: dict) -> dict:
         """
         Attempts to add an external account by making a request to the specified endpoint. The method

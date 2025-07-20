@@ -193,3 +193,42 @@ class CustomerViewSet(viewsets.ReadOnlyModelViewSet):
                 {"error": {"message": "Internal Server Error.", "details": str(e)}},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+    @action(detail=False, methods=['GET'], url_path='wallet-history')
+    def wallet_history(self, request):
+        """
+        A custom GET endpoint for wallet history.
+        Accessible at: /international-wallet/wallet-history/
+        """
+        # Initialize the Bridge API service
+        try:
+            serializer = self.wallet_details_serializer_class(data=request.data, context={'request': request})
+            if not serializer.is_valid():
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+            bridge_service = BridgeAPIService()
+            # Fetch all account wallet history from the Bridge API
+            wallets = bridge_service.wallet_history(serializer.data)
+            # If no wallet history detail found, return a 404 response
+            if not wallets:
+                return Response({"detail": "No wallet history found."}, status=status.HTTP_404_NOT_FOUND)
+
+            return Response(wallets, status=status.HTTP_200_OK)
+        except BridgeAPIError as e:
+            logger.error(f"Error requesting wallet history from Bridge API: {str(e)}", exc_info=True)
+            return Response(
+                {"error": {"message": str(e), "code": e.status_code, "details": e.response_data}},
+                status=e.status_code
+            )
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Network error requesting wallet history: {e}", exc_info=True)
+            return Response(
+                {"error": {"message": "Network or external service error.", "details": str(e)}},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
+        except Exception as e:
+            logger.error(f"Unexpected error in wallet_history: {e}", exc_info=True)
+            return Response(
+                {"error": {"message": "Internal Server Error.", "details": str(e)}},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

@@ -1,5 +1,5 @@
 from core_apps.international_wallet.serializers.bridge import (
-    CreateCustomerSerializer, InitiateTransferSerializer, ExternalAccountSerializer
+    CreateCustomerSerializer, InitiateTransferSerializer, ExternalAccountSerializer, CreateWalletSerializer
 )
 from core_apps.international_wallet.serializers.customer import CustomerSerializer
 from core_apps.international_wallet.serializers.external_bank_account import ExternalBankAccountSerializer

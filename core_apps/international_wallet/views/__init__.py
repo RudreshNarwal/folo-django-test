@@ -1,4 +1,4 @@
-from .bridge import RequestTOSLinkAPI, CreateCustomerAPI, InitiateTransferAPI, InitiateTransferAPI
+from .bridge import RequestTOSLinkAPI, CreateCustomerAPI, InitiateTransferAPI, InitiateTransferAPI, CreateWalletAPI
 from .customer import CustomerViewSet
 from .external_bank_account import ExternalBankAccountViewSet
 from .internationl_wallet import InternationalWalletTransactionViewSet

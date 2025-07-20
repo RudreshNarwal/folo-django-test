@@ -337,6 +337,165 @@ class BridgeAPIService:
             logger.error(f"Failed to create customer: {e}")
             raise
 
+    def create_wallet(self, waller_data) -> dict:
+        """
+        Creates a wallet for a customer by sending a request to the wallet service.
+
+        This method sends a POST request to the external wallet service to create a
+        new wallet address for the specified customer. It ensures idempotency by
+        including an idempotency key for the request. Successful responses return
+        the wallet details, while exceptions are logged and re-raised.
+
+        Args:
+            waller_data (dict): A dictionary containing wallet creation data,
+                including the 'customer_id' field which identifies the customer
+                for whom the wallet is being created.
+
+        Returns:
+            dict: A response dictionary containing the details of the created wallet.
+
+        Raises:
+            BridgeAPIError: If there is an error during the wallet creation process
+                specific to the Bridge API.
+            requests.exceptions.RequestException: If there is a general network
+                or HTTP error during the request.
+        """
+        logger.info("Attempting to request wallet address for customer.")
+        try:
+            response = self._make_request(
+                method="POST",
+                endpoint=f"/v0/customers/{waller_data.pop('customer_id')}/wallets",
+                data=waller_data,
+                include_idempotency_key=True  # POST requests should always have idempotency keys
+            )
+            logger.info("Successfully requested wallet address for customer.")
+            return response
+        except (BridgeAPIError, requests.exceptions.RequestException) as e:
+            logger.error(f"Failed to request wallet address for customer: {e}")
+            raise
+
+    def wallet_details(self, wallet_data) -> dict:
+        """
+        Attempts to fetch detailed information about a customer's wallet from an external
+        API endpoint using provided wallet data. Handles API request errors gracefully by
+        logging failures and re-raising exceptions.
+
+        Args:
+            wallet_data (dict): A dictionary containing information about the wallet,
+                including at least 'customer_id' and 'wallet_address' keys.
+
+        Returns:
+            dict: The response from the external API containing wallet details.
+
+        Raises:
+            BridgeAPIError: If there is an error specific to the API bridge.
+            requests.exceptions.RequestException: If there is a network or request-related
+                error.
+        """
+        logger.info("Attempting to request wallet data for customer.")
+        try:
+            response = self._make_request(
+                method="GET",
+                endpoint=f"/v0/customers/{wallet_data['customer_id']}/wallets/{wallet_data['wallet_address']}",
+                include_idempotency_key=False
+            )
+            logger.info("Successfully requested wallet data for customer.")
+            return response
+        except (BridgeAPIError, requests.exceptions.RequestException) as e:
+            logger.error(f"Failed to request wallet address for customer: {e}")
+            raise
+
+    def all_wallets(self, wallet_data) -> dict:
+        """
+        Requests and retrieves all wallets associated with a customer.
+
+        This method sends a GET request to retrieve all wallets for a specified customer
+        using the customer's ID. If the request is successful, it returns the response
+        containing wallet details. In case of an error during the request, an exception
+        is raised and logged.
+
+        Args:
+            wallet_data (dict): A dictionary containing the customer ID required to
+                retrieve the wallets.
+
+        Returns:
+            dict: The response received from the API containing wallet data.
+
+        Raises:
+            BridgeAPIError: If there is an error specific to the Bridge API.
+            requests.exceptions.RequestException: If a request-related exception occurs.
+        """
+        logger.info("Attempting to request all wallets for customer.")
+        try:
+            response = self._make_request(
+                method="GET",
+                endpoint=f"/v0/customers/{wallet_data['customer_id']}/wallets",
+                include_idempotency_key=False
+            )
+            logger.info("Successfully requested all wallets for customer.")
+            return response
+        except (BridgeAPIError, requests.exceptions.RequestException) as e:
+            logger.error(f"Failed to request all wallets for customer: {e}")
+            raise
+
+    def all_account_wallets(self) -> dict:
+        """
+        Retrieves all wallets associated with the account.
+
+        This method sends a GET request to the specified endpoint to fetch all
+        wallets for the account. If the request is successful, the response
+        containing wallet data is returned. In case of an error during the
+        request, appropriate exceptions are logged and raised.
+
+        Returns:
+            dict: A dictionary containing details of all wallets associated
+            with the account.
+
+        Raises:
+            BridgeAPIError: If the Bridge API returns an error response.
+            requests.exceptions.RequestException: If a network-related error
+            occurs during the request.
+        """
+        logger.info("Attempting to request account all wallets.")
+        try:
+            response = self._make_request(
+                method="GET",
+                endpoint=f"/v0/wallets",
+                include_idempotency_key=False
+            )
+            logger.info("Successfully requested account all wallets.")
+            return response
+        except (BridgeAPIError, requests.exceptions.RequestException) as e:
+            logger.error(f"Failed to request account all wallets: {e}")
+            raise
+
+    def total_balances(self) -> dict:
+        """
+        Request and return total balances for all wallets.
+
+        A method that sends a GET request to retrieve the total balances for
+        all wallets within the system. This method utilizes an endpoint and
+        handles potential exceptions that might occur during the request process.
+
+        Returns:
+            dict: A dictionary containing the total balances for all wallets.
+
+        Raises:
+            BridgeAPIError: Raised when an error occurs specific to the Bridge API.
+            requests.exceptions.RequestException: Raised when a general request exception occurs.
+        """
+        logger.info("Attempting to request total balances for all wallets.")
+        try:
+            response = self._make_request(
+                method="GET",
+                endpoint=f"/v0/wallets/total_balances",
+                include_idempotency_key=False
+            )
+            logger.info("Successfully requested total balances for all wallets.")
+            return response
+        except (BridgeAPIError, requests.exceptions.RequestException) as e:
+            logger.error(f"Failed to request total balances for all wallets: {e}")
+            raise
 
     def external_account(self, external_account_data: dict) -> dict:
         """
@@ -369,7 +528,6 @@ class BridgeAPIService:
         except (BridgeAPIError, requests.exceptions.RequestException) as e:
             logger.error(f"Failed to add external account: {e}")
             raise
-
 
     def initiate_transfer(self, transfer_data: dict) -> dict:
         """

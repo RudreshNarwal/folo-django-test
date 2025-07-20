@@ -26,6 +26,12 @@ class Customer(GenericModel):
         provider (CharField): Indicates the provider associated with the
             customer, constrained by the predefined choices in the Provider
             enumeration. This field has a maximum length of 128.
+        signed_agreement_id (CharField): A string field to store the ID of the
+        signed agreement, with a maximum length of 255 characters.
+        chain (CharField): Represents the blockchain chain associated with the
+            customer, using choices from the Chain enumeration. It has a maximum
+            length of 128.
+        wallet_address (CharField): The blockchain address of the customer,
     """
     class CurrentStatus(models.TextChoices):
         NA = ("N/A", _("N/A"))
@@ -41,6 +47,11 @@ class Customer(GenericModel):
 
     class Provider(models.TextChoices):
         BRIDGE = ("Bridge", _("Bridge"))
+
+    class Chain(models.TextChoices):
+        UNDEFINED = ("Undefined", _("Undefined"))
+        BASE = ("Base", _("Base"))
+        SOLANA = ("Solana", _("Solana"))
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, related_name='wallet_customer', on_delete=models.PROTECT
@@ -59,6 +70,17 @@ class Customer(GenericModel):
         default=Provider.BRIDGE,
     )
     signed_agreement_id = models.CharField(max_length=255)
+    chain = models.CharField(
+        verbose_name=_("chain"),
+        null=True, blank=True,
+        choices=Chain.choices,
+        max_length=128,
+        default=Chain.UNDEFINED,
+    )
+    wallet_address = models.CharField(
+        max_length=128, null=True, blank=True,
+        help_text=_("The address of the customer on the blockchain.")
+    )
 
     def __str__(self):
         return self.user.username

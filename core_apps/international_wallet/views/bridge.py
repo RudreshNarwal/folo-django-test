@@ -16,7 +16,7 @@ from core_apps.international_wallet.services import (
 
 from core_apps.international_wallet.serializers import (
     CreateCustomerSerializer, CustomerSerializer, ExternalAccountSerializer, InitiateTransferSerializer,
-    InternationalWalletTransactionSerializer
+    InternationalWalletTransactionSerializer, CreateWalletSerializer
 )
 import requests # Import requests directly for generic RequestException handling
 
@@ -156,6 +156,74 @@ class CreateCustomerAPI(APIView):
             )
         except Exception as e:
             logger.error(f"Unexpected error in CreateCustomerAPI: {e}", exc_info=True)
+            return Response(
+                {"error": {"message": "Internal Server Error.", "details": str(e)}},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class CreateWalletAPI(APIView):
+    """
+    API endpoint to request the waller creation for a customer.
+
+    - Requires authentication (IsAuthenticated).
+    - Returns a JSON response with the success message or an error.
+    """
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic()
+    def post(self, request, *args, **kwargs):
+        """
+        Handles POST requests to get a waller address.
+        """
+        serializer = CreateWalletSerializer(data=request.data, context={"request": self.request})
+        if not serializer.is_valid():
+            logger.warning(f"Invalid request data for customer waller creation: {serializer.errors}")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        # Initialize the Bridge API service
+        bridge_service = BridgeAPIService()
+
+        if not bridge_service:
+            return Response({"error": {"message": "API Service not initialized.", "code": 500}}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        try:
+            response_data = bridge_service.create_wallet(waller_data=serializer.validated_data)
+            # Save the wallet address to the user model for future reference
+            if response_data:
+                # Extract the query parameters
+                wallet_address = response_data.get("address")
+                chain = response_data.get("chain")
+
+                if not wallet_address or not chain:
+                    return Response({"error": {"message": "Wallet address not receive.", "code": 500}},
+                                    status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+                # Update a Customer instance in the database
+                Customer.objects.filter(
+                    user=request.user,
+                    provider='BRIDGE'
+                ).update(
+                    chain=chain.upper(),
+                    wallet_address=wallet_address,
+                    updated_by=request.user,
+                )
+
+            return Response(response_data, status=status.HTTP_200_OK)
+        except BridgeAPIError as e:
+            logger.error(f"Error requesting wallet address from Bridge API: {str(e)}", exc_info=True)
+            return Response(
+                {"error": {"message": str(e), "code": e.status_code, "details": e.response_data}},
+                status=e.status_code
+            )
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Network error requesting wallet address: {e}", exc_info=True)
+            return Response(
+                {"error": {"message": "Network or external service error.", "details": str(e)}},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
+        except Exception as e:
+            logger.error(f"Unexpected error in CreateWalletAPI: {e}", exc_info=True)
             return Response(
                 {"error": {"message": "Internal Server Error.", "details": str(e)}},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR

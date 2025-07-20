@@ -2,7 +2,6 @@ from rest_framework import serializers
 
 from core_apps.common.services.image_conversion_services import get_image_data_uri_from_signed_url
 from core_apps.international_wallet.models.customer import Customer
-from core_apps.international_wallet.models.external_bank_account import ExternalBankAccount
 from core_apps.international_wallet.services.external_bank_account import ExternalBankAccountService
 from core_apps.users.models.user import Address
 from core_apps.users.utils import generate_presigned_url
@@ -71,6 +70,7 @@ class CreateCustomerSerializer(serializers.Serializer):
     Serializer for the create_customer_api endpoint.
     Validates all required fields for customer creation.
     """
+
     def validate(self, data):
         """
         Custom validation to ensure that all data is present and valid.
@@ -260,6 +260,45 @@ class CreateCustomerSerializer(serializers.Serializer):
         return data
 
 
+class CreateWalletSerializer(serializers.Serializer):
+    """
+    Serializer for the create_wallet_api endpoint.
+    Validates all required fields for customer wallet creation.
+    """
+
+    def validate(self, data):
+        """
+        Custom validation to ensure that all data is present and valid.
+        """
+        # Ensure the request context is available
+        request_user = self.context.get("request").user
+
+        try:
+            customer = Customer.objects.get(
+                user=request_user,
+                provider='BRIDGE',
+            )
+        except Customer.DoesNotExist:
+            customer = None
+
+        if not customer:
+            raise serializers.ValidationError("International customer not found for this user.")
+
+        customer_id = customer.customer_id
+        if not customer_id:
+            raise serializers.ValidationError("International customer does not onboarded yet.")
+
+        if customer.current_status != 'ACTIVE':
+            raise serializers.ValidationError("International customer is not active for wallet configuration.")
+
+        if customer.wallet_address is not None and customer.wallet_address != "":
+            raise serializers.ValidationError("International customer already has a wallet address.")
+
+        data["customer_id"] = customer_id
+        data["chain"] = "solana"  # Assuming Solana is the only supported chain for now
+        return data
+
+
 class ExternalAccountSerializer(serializers.Serializer):
     """
     Serializer for the external account endpoint.
@@ -387,7 +426,8 @@ class InitiateTransferSerializer(serializers.Serializer):
     Serializer for the initiate_transfer_api endpoint.
     Validates all required fields for transfer initiation.
     """
-    amount = serializers.CharField(max_length=50, help_text="Amount as a string (important for decimals, e.g., '100.00').")
+    amount = serializers.CharField(max_length=50,
+                                   help_text="Amount as a string (important for decimals, e.g., '100.00').")
     source_payment_rail = serializers.CharField(
         max_length=50, help_text="Payment rail for the source (e.g., 'wire', 'ach')."
     )

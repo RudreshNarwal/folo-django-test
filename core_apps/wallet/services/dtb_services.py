@@ -7,6 +7,14 @@ from requests.exceptions import HTTPError, RequestException, Timeout
 
 logger = logging.getLogger(__name__)
 
+# Import SCA service for handling SCA challenges
+try:
+    from ..services.sca_service import SCAService, SCAServiceError
+except ImportError:
+    logger.warning("SCA service not available - SCA functionality will be disabled")
+    SCAService = None
+    SCAServiceError = Exception
+
 
 class DTBService:
     BASE_URL = 'https://api.astraafrica.co/astra-conductor/rest/v1'
@@ -74,7 +82,7 @@ class DTBService:
 
     def request_with_retries(self, method, url, **kwargs):
         """
-        Generic request method with retries and JWT renewal on 401 Unauthorized.
+        Generic request method with retries, JWT renewal on 401, and SCA challenge handling on 403.
         """
         max_retries = 2
         backoff_factor = 1
@@ -87,6 +95,7 @@ class DTBService:
             except HTTPError as http_err:
                 resp = http_err.response
                 logger.error(f"HTTP error: {resp.status_code} {resp.text}")
+
                 if resp.status_code == 401:
                     logger.debug("JWT expired or invalid. Attempting renewal.")
                     try:
@@ -96,6 +105,19 @@ class DTBService:
                     except DTBServiceAuthenticationError:
                         # Cannot renew JWT; re-raise
                         raise
+                elif resp.status_code == 403 and SCAService:
+                    # Check if this is an SCA challenge
+                    sca_service = SCAService()
+                    sca_challenge = sca_service.parse_sca_challenge(resp)
+                    if sca_challenge:
+                        logger.debug(f"SCA challenge detected: {sca_challenge}")
+                        raise DTBServiceSCAChallengeError(
+                            f"SCA challenge required: {sca_challenge['sca_type']}",
+                            sca_challenge=sca_challenge
+                        )
+                    else:
+                        # 403 but not SCA challenge
+                        raise DTBServiceAPIError(resp.status_code, resp.text, error_details=resp.json())
                 else:
                     # For other HTTP errors, raise an API error
                     raise DTBServiceAPIError(resp.status_code, resp.text, error_details=resp.json())
@@ -321,3 +343,10 @@ class DTBServiceAPIError(DTBServiceError):
         self.message = message
         self.error_details = error_details
         super().__init__(f"API Error {status_code}: {message}")
+
+
+class DTBServiceSCAChallengeError(DTBServiceError):
+    """Exception raised when DTB requires SCA challenge."""
+    def __init__(self, message, sca_challenge=None):
+        self.sca_challenge = sca_challenge
+        super().__init__(message)

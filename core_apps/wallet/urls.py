@@ -42,6 +42,11 @@ from .views.bank_transfer import (
     GetBankTransferFeeAPIView
 )
 
+# Import from views/sca.py (SCA views)
+from .views.sca import (
+    SCAUpgradeJWTAPIView,
+)
+
 urlpatterns = [
     path('finalize-registration/', FinalizeRegistrationAPIView.as_view(), name='finalize_registration'),
     path('create-wallet/', CreateCustomerWalletAPIView.as_view(), name='create-wallet'),
@@ -85,7 +90,10 @@ urlpatterns = [
 
     # MPIN management endpoint
     path('mpin/update/', UpdateWalletMpinAPIView.as_view(), name='update-wallet-mpin'),
-    
+
+    # SCA endpoints
+    path('sca/upgrade-jwt/', SCAUpgradeJWTAPIView.as_view(), name='sca-upgrade-jwt'),
+
     # Webhook endpoints
     path('movement/callback/', WalletMovementCallbackAPIView.as_view(), name='wallet-movement-callback'),
     path('kyc/manual-ratification/webhook/', ManualRatificationWebhookAPIView.as_view(), name='manual-ratification-webhook'),

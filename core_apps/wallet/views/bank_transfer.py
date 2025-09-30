@@ -19,10 +19,27 @@ from ..services.dtb_services import (
     DTBServiceError,
     DTBServiceAuthenticationError,
     DTBServiceAPIError,
+    DTBServiceSCAChallengeError,
 )
 from ..tasks import schedule_transaction_timeout_check
 
 logger = logging.getLogger(__name__)
+
+
+# Helper function to extract SCA JWT from headers
+def get_sca_jwt_from_headers(headers):
+    """Extract SCA JWT from request headers."""
+    sca_jwt = headers.get('X-SCA-JWT')
+    if sca_jwt:
+        # Import SCAService to validate JWT
+        try:
+            from ..services.sca_service import SCAService
+            sca_service = SCAService()
+            if sca_service.validate_sca_jwt(sca_jwt):
+                return sca_jwt
+        except Exception as e:
+            logger.warning(f"Error validating SCA JWT: {e}")
+    return None
 
 
 class WalletToBankTransferAPIView(APIView):
@@ -75,8 +92,16 @@ class WalletToBankTransferAPIView(APIView):
             bank_beneficiary=beneficiary
         )
 
-        # Prepare payload based on transfer type
-        dtb_service = DTBService()
+        # Check for SCA retry
+        sca_jwt = get_sca_jwt_from_headers(request.headers)
+        if sca_jwt:
+            # SCA retry - use upgraded JWT
+            dtb_service = DTBService()
+            dtb_service.headers['Authorization'] = f'Bearer {sca_jwt}'
+        else:
+            # Normal flow - use standard DTB service
+            dtb_service = DTBService()
+
         callback_url = settings.BANK_TRANSFER_CALLBACK_URL
 
         if transfer_type == 'PESALINK':
@@ -173,6 +198,16 @@ class WalletToBankTransferAPIView(APIView):
                     "status": response.get('status'),
                     "details": response.get('extraInfo', response)
                 }, status=status.HTTP_400_BAD_REQUEST)
+
+        except DTBServiceSCAChallengeError as e:
+            # Handle SCA challenge
+            logger.info(f"SCA challenge detected for bank transfer: {e}")
+            return Response({
+                "error": "SCA challenge required",
+                "sca_challenge": e.sca_challenge,
+                "transaction_id": str(transaction.transaction_id),
+                "message": "Please complete OTP verification to proceed"
+            }, status=status.HTTP_403_FORBIDDEN)
 
         except (DTBServiceAuthenticationError, DTBServiceAPIError) as e:
             transaction.status = 'FAILED'

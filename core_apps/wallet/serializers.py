@@ -524,3 +524,27 @@ class BankTransferFeeResponseSerializer(serializers.Serializer):
     """Serializer for bank transfer fee responses."""
     fee_amount = serializers.DecimalField(max_digits=20, decimal_places=2, source="feeAmount")
     transfer_type = serializers.CharField()
+
+
+class SCAUpgradeSerializer(serializers.Serializer):
+    """Serializer for SCA JWT upgrade requests."""
+    intent_id = serializers.CharField(
+        max_length=100,
+        help_text="SCA intent ID from DTB challenge response"
+    )
+    otp = serializers.CharField(
+        max_length=20,
+        help_text="One-time password for SCA verification"
+    )
+
+    def validate_intent_id(self, value):
+        """Validate intent_id format."""
+        if not value or len(value) < 10:
+            raise serializers.ValidationError("Invalid intent_id format")
+        return value
+
+    def validate_otp(self, value):
+        """Validate OTP format."""
+        if not value or len(value) < 4:
+            raise serializers.ValidationError("Invalid OTP format")
+        return value

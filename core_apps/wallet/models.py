@@ -310,3 +310,89 @@ class Transaction(models.Model):
 		verbose_name = "Transaction"
 		verbose_name_plural = "Transactions"
 		ordering = ['-created_at']
+
+
+class WalletMovementCallback(models.Model):
+	"""
+	Store DTB wallet movement webhook callbacks separately from user transactions.
+	This prevents duplicate transaction records while maintaining complete audit trail.
+	"""
+	
+	# Primary identification - DTB's unique transaction ID to prevent duplicate processing
+	dtb_transaction_id = models.CharField(
+		max_length=50, 
+		unique=True, 
+		help_text="DTB's unique transaction ID to prevent duplicate processing"
+	)
+	
+	# Link to original transactions (only one will be populated)
+	transaction = models.ForeignKey(
+		'Transaction', 
+		null=True, 
+		blank=True, 
+		on_delete=models.CASCADE, 
+		related_name='webhook_callbacks'
+	)
+	topup_transaction = models.ForeignKey(
+		'TopUpTransaction', 
+		null=True, 
+		blank=True,
+		on_delete=models.CASCADE, 
+		related_name='webhook_callbacks'
+	)
+	
+	# Extracted webhook data
+	external_unique_id = models.UUIDField(
+		null=True, 
+		blank=True,
+		help_text="Original external unique ID (without DB-/CR- prefix)"
+	)
+	external_reference_id = models.CharField(
+		max_length=100, 
+		help_text="DTB prefixed reference (DB-/CR-xxxxx)"
+	)
+	wallet_id = models.PositiveIntegerField(help_text="Wallet ID from webhook")
+	transaction_type = models.CharField(
+		max_length=50, 
+		help_text="DTB transaction type (tfr.debit, tfr.credit, etc.)"
+	)
+	amount = models.DecimalField(
+		max_digits=20, 
+		decimal_places=2, 
+		help_text="Movement amount (negative for debit, positive for credit)"
+	)
+	currency = models.CharField(max_length=3, default='KES')
+	balance_after = models.DecimalField(
+		max_digits=20, 
+		decimal_places=2, 
+		help_text="Wallet balance after this movement"
+	)
+	
+	# Additional webhook metadata
+	other_wallet_id = models.PositiveIntegerField(null=True, blank=True)
+	location = models.GenericIPAddressField(null=True, blank=True)
+	
+	# Complete audit trail
+	webhook_data = models.JSONField(help_text="Complete webhook payload from DTB")
+	
+	# Processing status
+	processed = models.BooleanField(default=False)
+	processing_error = models.TextField(null=True, blank=True)
+	
+	# Timestamps
+	created_at = models.DateTimeField(auto_now_add=True)
+	updated_at = models.DateTimeField(auto_now=True)
+	
+	class Meta:
+		verbose_name = "Wallet Movement Callback"
+		verbose_name_plural = "Wallet Movement Callbacks"
+		ordering = ['-created_at']
+		indexes = [
+			models.Index(fields=['external_unique_id']),
+			models.Index(fields=['wallet_id']),
+			models.Index(fields=['dtb_transaction_id']),
+			models.Index(fields=['processed']),
+		]
+	
+	def __str__(self):
+		return f"Webhook {self.dtb_transaction_id} - {self.transaction_type} ({self.amount})"

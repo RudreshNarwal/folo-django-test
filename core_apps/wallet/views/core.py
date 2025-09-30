@@ -676,229 +676,37 @@ class WalletDetailsAPIView(APIView):
 
 class WalletMovementCallbackAPIView(APIView):
 	"""
-	Webhook endpoint for wallet movement notifications.
-	Receives callbacks when money is credited to or debited from a wallet.
+	Enhanced webhook endpoint for wallet movement notifications.
+	Prevents duplicate transactions by storing webhooks separately.
 	"""
 	permission_classes = []  # Allow unauthenticated access for webhook callbacks
 	
-	# Mapping DTB transaction types to our internal transaction types
-	DTB_TO_INTERNAL_TYPE_MAPPING = {
-		'tfr.debit.withdrawal.ke_dtb_mpesa': 'WALLET_TO_MPESA',
-		'tfr.debit.withdrawal.ke_dtb_eft': 'WALLET_TO_BANK',
-		'tfr.debit.fee.withdrawal.ke_dtb_mpesa': 'FEE',
-		'tfr.debit.fee.withdrawal.ke_dtb_eft': 'FEE',
-		'tfr.credit.topup': 'TOPUP',
-		'tfr.debit.transfer': 'WALLET_TO_WALLET',
-		'tfr.credit.transfer': 'WALLET_TO_WALLET',
-		'tfr.credit.refund': 'REFUND',
-		'tfr.debit.reversal': 'REVERSAL',
-		'tfr.credit.adjustment': 'ADJUSTMENT',
-		'tfr.debit.adjustment': 'ADJUSTMENT',
-	}
-	
 	def post(self, request):
 		data = request.data
-		transaction_id = data.get('transactionId')
-		wallet_id = data.get('walletId')
-		transaction_type = data.get('type')
-		transaction_date = data.get('date')
-		amount = data.get('amount')
-		currency = data.get('currency')
-		balance = data.get('balance')
-		description = data.get('description')
-		external_id = data.get('externalId')
-		external_unique_id = data.get('externalUniqueId')
-		other_wallet_id = data.get('otherWalletId')
-		location = data.get('location')
-		
-		logger.info(f"Wallet movement callback received: {data}")
+		logger.info(f"Wallet movement webhook received: {data}")
 		
 		try:
-			# Find the wallet
-			wallet = Wallet.objects.get(wallet_id=wallet_id)
+			from ..services.webhook_service import WebhookProcessor
+			processor = WebhookProcessor()
+			callback, created = processor.process_wallet_movement(data)
 			
-			# Update wallet balance with the latest balance from callback
-			wallet.current_balance = balance
-			# For available balance, we'll use the same value unless there are reservations
-			wallet.available_balance = balance - float(wallet.reservations or 0)
-			wallet.save()
-			
-			# Determine if this is a fee transaction
-			is_fee_transaction = 'fee' in transaction_type.lower()
-			
-			# Map DTB transaction type to internal type
-			internal_transaction_type = self.DTB_TO_INTERNAL_TYPE_MAPPING.get(
-				transaction_type.lower(), 
-				'ADJUSTMENT'  # Default to adjustment for unknown types
-			)
-			
-			# Check if we have a corresponding transaction record
-			transaction = None
-			if external_unique_id and not is_fee_transaction:
-				# Try to find the transaction by external_unique_id
-				try:
-					# First try to find in Transaction model (wallet-to-wallet, wallet-to-mpesa)
-					try:
-						uuid_external_id = uuid.UUID(external_unique_id)
-						transaction = Transaction.objects.get(external_unique_id=uuid_external_id)
-						transaction_found = True
-					except (ValueError, Transaction.DoesNotExist):
-						transaction_found = False
-					
-					# If not found in Transaction, try TopUpTransaction
-					if not transaction_found:
-						try:
-							uuid_external_id = uuid.UUID(external_unique_id)
-							transaction = TopUpTransaction.objects.get(external_unique_id=uuid_external_id)
-							transaction_found = True
-						except (ValueError, TopUpTransaction.DoesNotExist):
-							transaction_found = False
-					
-					# If still not found, try other fields
-					if not transaction_found:
-						# Try Transaction model with other fields
-						transaction = Transaction.objects.filter(
-							Q(reference=external_unique_id) | 
-							Q(external_reference_id=external_unique_id)
-						).first()
-						
-						if not transaction:
-							# Try TopUpTransaction model
-							transaction = TopUpTransaction.objects.filter(
-								Q(payment_reference=external_unique_id)
-							).first()
-					
-					# If no existing transaction found, create a new one for untracked movements
-					if not transaction and internal_transaction_type in ['REFUND', 'REVERSAL', 'ADJUSTMENT']:
-						transaction = Transaction.objects.create(
-							external_unique_id=uuid.uuid4(),  # Generate new UUID
-							external_reference_id=external_unique_id,
-							transaction_type=internal_transaction_type,
-							amount=abs(amount),
-							from_wallet=wallet if amount < 0 else None,
-							to_wallet=wallet if amount > 0 else None,
-							currency=currency,
-							status='SUCCESSFUL',  # Movement already happened
-							user=wallet.user,
-							customer=wallet.customer,
-							description=description or f"System {internal_transaction_type.lower()}",
-							gateway_transaction_id=str(transaction_id),
-						)
-						logger.info(f"Created new transaction for untracked movement: {transaction.transaction_id}")
-						
-					if transaction:
-						# Update transaction with callback data
-						if isinstance(transaction, Transaction):
-							if not transaction.gateway_transaction_id and transaction_id:
-								transaction.gateway_transaction_id = str(transaction_id)
-							
-							# Store the callback data in extra_info
-							if not transaction.extra_info:
-								transaction.extra_info = {}
-							transaction.extra_info['wallet_movement_callback'] = {
-								'transaction_id': transaction_id,
-								'type': transaction_type,
-								'date': transaction_date,
-								'balance_after': float(balance),
-								'other_wallet_id': other_wallet_id,
-								'location': location,
-								'internal_type': internal_transaction_type
-							}
-							
-							# Update status based on movement type and amount
-							if transaction.status == 'PENDING':
-								if amount < 0:  # Debit means transaction went through
-									transaction.status = 'SUCCESSFUL'
-								elif amount > 0 and internal_transaction_type in ['REFUND', 'REVERSAL']:
-									transaction.status = 'REVERSED' if internal_transaction_type == 'REVERSAL' else 'SUCCESSFUL'
-							
-							transaction.save()
-							logger.info(f"Updated transaction {transaction.transaction_id} with wallet movement data")
-							
-						elif isinstance(transaction, TopUpTransaction):
-							if not transaction.gateway_transaction_id and transaction_id:
-								transaction.gateway_transaction_id = str(transaction_id)
-							
-							# Store the callback data in extra_info
-							if not transaction.extra_info:
-								transaction.extra_info = {}
-							transaction.extra_info['wallet_movement_callback'] = {
-								'transaction_id': transaction_id,
-								'type': transaction_type,
-								'date': transaction_date,
-								'balance_after': float(balance),
-								'other_wallet_id': other_wallet_id,
-								'location': location,
-								'internal_type': internal_transaction_type
-							}
-							
-							# Update status if transaction was pending
-							if transaction.status == 'PENDING' and amount > 0:  # Credit means top-up went through
-								transaction.status = 'SUCCESSFUL'
-							
-							transaction.save()
-							logger.info(f"Updated top-up transaction {transaction.payment_id} with wallet movement data")
-							
-				except Exception as e:
-					logger.error(f"Error finding/updating transaction for external_unique_id {external_unique_id}: {e}")
-			
-			# Handle fee transactions
-			if is_fee_transaction and external_id:
-				# Try to find the main transaction and update its fee
-				try:
-					# Fee transactions typically reference the main transaction's ID
-					# First try Transaction model
-					main_transaction = Transaction.objects.filter(
-						Q(withdrawal_id=external_id) |
-						Q(external_reference_id=external_id) |
-						Q(reference=external_id)
-					).first()
-					
-					if not main_transaction:
-						# Try TopUpTransaction model
-						main_transaction = TopUpTransaction.objects.filter(
-							Q(payment_id=external_id) |
-							Q(payment_reference=external_id)
-						).first()
-					
-					if main_transaction and abs(amount) > 0:
-						# Update the fee amount (fees are negative in callbacks)
-						main_transaction.fee = abs(amount)
-						if not main_transaction.extra_info:
-							main_transaction.extra_info = {}
-						main_transaction.extra_info['fee_callback'] = {
-							'transaction_id': transaction_id,
-							'type': transaction_type,
-							'date': transaction_date,
-							'fee_amount': abs(amount),
-							'other_wallet_id': other_wallet_id,
-							'internal_type': internal_transaction_type
-						}
-						main_transaction.save()
-						
-						if isinstance(main_transaction, Transaction):
-							logger.info(f"Updated transaction {main_transaction.transaction_id} with fee information")
-						else:
-							logger.info(f"Updated top-up transaction {main_transaction.payment_id} with fee information")
-				except Exception as e:
-					logger.error(f"Error updating fee for transaction {external_id}: {e}")
-			
-			# Log wallet movement for audit purposes
-			logger.info(
-				f"Wallet {wallet_id} movement: {transaction_type} ({internal_transaction_type}) "
-				f"Amount: {amount} {currency}, Balance: {balance}, "
-				f"Description: {description}, External ID: {external_unique_id}"
-			)
-			
-			return Response({"message": "Wallet movement callback processed successfully"}, status=status.HTTP_200_OK)
-			
-		except Wallet.DoesNotExist:
-			logger.error(f"Wallet movement callback received for unknown wallet: {wallet_id}")
-			return Response({"error": "Wallet not found"}, status=status.HTTP_404_NOT_FOUND)
-		
+			if created:
+				return Response({
+					"message": "Webhook processed successfully",
+					"callback_id": callback.id
+				}, status=status.HTTP_200_OK)
+			else:
+				return Response({
+					"message": "Webhook already processed",
+					"callback_id": callback.id
+				}, status=status.HTTP_200_OK)
+				
 		except Exception as e:
-			logger.error(f"Error processing wallet movement callback: {e}")
-			return Response({"error": "An unexpected error occurred"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+			logger.error(f"Error processing wallet movement webhook: {e}")
+			return Response({
+				"error": "Webhook processing failed",
+				"details": str(e)
+			}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class ManualRatificationWebhookAPIView(APIView):

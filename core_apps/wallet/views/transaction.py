@@ -29,10 +29,27 @@ from ..services.dtb_services import (
     DTBServiceError,
     DTBServiceAuthenticationError,
     DTBServiceAPIError,
+    DTBServiceSCAChallengeError,
 )
 from ..tasks import schedule_transaction_timeout_check
 
 logger = logging.getLogger(__name__)
+
+
+# Helper function to extract SCA JWT from headers
+def get_sca_jwt_from_headers(headers):
+    """Extract SCA JWT from request headers."""
+    sca_jwt = headers.get('X-SCA-JWT')
+    if sca_jwt:
+        # Import SCAService to validate JWT
+        try:
+            from ..services.sca_service import SCAService
+            sca_service = SCAService()
+            if sca_service.validate_sca_jwt(sca_jwt):
+                return sca_jwt
+        except Exception as e:
+            logger.warning(f"Error validating SCA JWT: {e}")
+    return None
 
 
 # Event Manager Mixin
@@ -154,22 +171,30 @@ class WalletToWalletTransferAPIView(APIView):
             "toWalletId": to_wallet_id
         }
         
-        # Call DTB service
-        dtb_service = DTBService()
+        # Check for SCA retry
+        sca_jwt = get_sca_jwt_from_headers(request.headers)
+        if sca_jwt:
+            # SCA retry - use upgraded JWT
+            dtb_service = DTBService()
+            dtb_service.headers['Authorization'] = f'Bearer {sca_jwt}'
+        else:
+            # Normal flow - use standard DTB service
+            dtb_service = DTBService()
+
         try:
             response_code = dtb_service.wallet_to_wallet_transfer(payload)
-            
+
             # Update transaction status based on response
             if response_code == 204:  # No Content - Success response
                 transaction.status = 'SUCCESSFUL'
                 transaction.save()
-                
+
                 # Update wallet balance (fetch latest)
                 wallet_details = dtb_service.get_wallet_details(from_wallet_id)
                 from_wallet.available_balance = wallet_details['availableBalance']
                 from_wallet.current_balance = wallet_details['currentBalance']
                 from_wallet.save()
-                
+
                 # Return success response
                 return Response({
                     "message": "Transfer completed successfully",
@@ -187,7 +212,17 @@ class WalletToWalletTransferAPIView(APIView):
                     "error": f"Transfer failed with response code: {response_code}",
                     "transaction_id": str(transaction.transaction_id)
                 }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-                
+
+        except DTBServiceSCAChallengeError as e:
+            # Handle SCA challenge
+            logger.info(f"SCA challenge detected for wallet transfer: {e}")
+            return Response({
+                "error": "SCA challenge required",
+                "sca_challenge": e.sca_challenge,
+                "transaction_id": str(transaction.transaction_id),
+                "message": "Please complete OTP verification to proceed"
+            }, status=status.HTTP_403_FORBIDDEN)
+
         except (DTBServiceAuthenticationError, DTBServiceAPIError) as e:
             # Handle API errors
             transaction.status = 'FAILED'
@@ -240,7 +275,16 @@ class WalletToMpesaTransferAPIView(TransactionEventManagerMixin, APIView):
 
         # Generate unique ID for the transaction
         external_unique_id = uuid.uuid4()
-        dtb_service = DTBService()
+
+        # Check for SCA retry
+        sca_jwt = get_sca_jwt_from_headers(request.headers)
+        if sca_jwt:
+            # SCA retry - use upgraded JWT
+            dtb_service = DTBService()
+            dtb_service.headers['Authorization'] = f'Bearer {sca_jwt}'
+        else:
+            # Normal flow - use standard DTB service
+            dtb_service = DTBService()
 
         # --- Perform Wallet-to-MPESA Transfer ---
         transaction_type = 'WALLET_TO_MPESA'
@@ -345,6 +389,16 @@ class WalletToMpesaTransferAPIView(TransactionEventManagerMixin, APIView):
                     "status": response.get('status'),
                     "details": response.get('extraInfo', response) # Show extraInfo if available
                 }, status=status.HTTP_400_BAD_REQUEST)
+
+        except DTBServiceSCAChallengeError as e:
+            # Handle SCA challenge
+            logger.info(f"SCA challenge detected for MPESA transfer: {e}")
+            return Response({
+                "error": "SCA challenge required",
+                "sca_challenge": e.sca_challenge,
+                "transaction_id": str(transaction.transaction_id),
+                "message": "Please complete OTP verification to proceed"
+            }, status=status.HTTP_403_FORBIDDEN)
 
         except (DTBServiceAuthenticationError, DTBServiceAPIError) as e:
             transaction.status = 'FAILED'
@@ -482,7 +536,7 @@ class MpesaWithdrawalWebhookAPIView(TransactionEventManagerMixin, APIView):
 
 
 class TransactionHistoryAPIView(generics.ListAPIView):
-    """API view for listing user's complete transaction history."""
+    """API view for listing user's complete transaction history (excluding webhook duplicates)."""
     permission_classes = [IsAuthenticated]
     serializer_class = TransactionSerializer
     pagination_class = TransactionHistoryPagination
@@ -501,12 +555,18 @@ class TransactionHistoryAPIView(generics.ListAPIView):
         # 1. Transactions initiated by the user (user=user)
         # 2. Incoming wallet-to-wallet transfers (to_wallet=user's wallet)
         # 3. System transactions affecting user's wallet (refunds, reversals, adjustments)
+        # EXCLUDE webhook-generated duplicate transactions
         from django.db.models import Q
         
         queryset = Transaction.objects.filter(
             Q(user=user) |  # Transactions initiated by user
             Q(from_wallet=wallet) |  # Outgoing from user's wallet
             Q(to_wallet=wallet)  # Incoming to user's wallet
+        ).exclude(
+            # Exclude webhook-generated ADJUSTMENT transactions with DTB prefixes
+            Q(transaction_type='ADJUSTMENT') & 
+            Q(external_reference_id__startswith='DB-') | 
+            Q(external_reference_id__startswith='CR-')
         ).distinct().order_by('-created_at')
         
         return queryset
@@ -636,6 +696,7 @@ class ComprehensiveWalletHistoryAPIView(generics.ListAPIView):
     """
     API view for listing complete wallet history including both 
     Transfer transactions and TopUp transactions in chronological order.
+    Excludes webhook-generated duplicate transactions.
     """
     permission_classes = [IsAuthenticated]
     pagination_class = TransactionHistoryPagination
@@ -651,9 +712,14 @@ class ComprehensiveWalletHistoryAPIView(generics.ListAPIView):
             return Transaction.objects.none()
         
         # Get all Transfer transactions where the user's wallet was the sender or receiver,
-        # then order them by the creation date in descending order.
+        # EXCLUDE webhook-generated duplicate transactions
         queryset = Transaction.objects.filter(
             Q(from_wallet=wallet) | Q(to_wallet=wallet)
+        ).exclude(
+            # Exclude webhook-generated ADJUSTMENT transactions with DTB prefixes
+            Q(transaction_type='ADJUSTMENT') & 
+            Q(external_reference_id__startswith='DB-') | 
+            Q(external_reference_id__startswith='CR-')
         ).distinct().order_by('-created_at')
         
         return queryset

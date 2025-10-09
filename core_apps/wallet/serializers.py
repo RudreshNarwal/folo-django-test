@@ -204,21 +204,21 @@ class WalletToWalletTransferSerializer(serializers.Serializer):
 	amount = serializers.DecimalField(max_digits=20, decimal_places=2, min_value=1)
 	description = serializers.CharField(required=False, allow_blank=True)
 	to_wallet_id = serializers.IntegerField()
-	mpin = serializers.CharField(write_only=True, min_length=4, max_length=6)
-	
+	# mpin = serializers.CharField(write_only=True, min_length=4, max_length=6)  # Removed MPIN requirement - SCA only
+
 	def validate_amount(self, value):
 		if value <= 0:
 			raise serializers.ValidationError("Amount must be greater than 0")
 		return value
-	
+
 	def validate(self, data):
 		# Get the user context from the serializer context
 		request = self.context.get('request')
 		if not request or not request.user.is_authenticated:
 			raise serializers.ValidationError({"error": "Authentication required"})
-		
+
 		user = request.user
-		
+
 		# Get the user's active wallet
 		try:
 			wallet = Wallet.objects.get(user=user, status='ACTIVE')
@@ -226,17 +226,18 @@ class WalletToWalletTransferSerializer(serializers.Serializer):
 			raise serializers.ValidationError({"error": "No active wallet found for your account"})
 		except Wallet.MultipleObjectsReturned:
 			wallet = Wallet.objects.filter(user=user, status='ACTIVE').first()
-		
+
 		# Set the from_wallet_id for other validations
 		self.wallet = wallet
-		
-		# Validate MPIN using direct comparison
-		# !! SECURITY WARNING: Assumes self.wallet.mpin is appropriately handled (e.g., hashed) !!
-		if not self.wallet.mpin:
-			raise serializers.ValidationError({"mpin": "MPIN is not set for your wallet. Please set it first."})
-		# Direct comparison:
-		if data['mpin'] != self.wallet.mpin:
-			raise serializers.ValidationError({"mpin": "Invalid MPIN"})
+
+		# MPIN validation removed - SCA only authentication
+		# # Validate MPIN using direct comparison
+		# # !! SECURITY WARNING: Assumes self.wallet.mpin is appropriately handled (e.g., hashed) !!
+		# if not self.wallet.mpin:
+		#     raise serializers.ValidationError({"mpin": "MPIN is not set for your wallet. Please set it first."})
+		# # Direct comparison:
+		# if data['mpin'] != self.wallet.mpin:
+		#     raise serializers.ValidationError({"mpin": "Invalid MPIN"})
 		
 		# Check if wallet has sufficient balance
 		if wallet.available_balance < data['amount']:
@@ -251,39 +252,41 @@ class WalletToMpesaTransferSerializer(serializers.Serializer):
 	)
 	phone_number = serializers.CharField(max_length=20)
 	contact_name = serializers.CharField(max_length=100, required=False, allow_blank=True)
-	mpin = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
+	# mpin = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})  # Removed MPIN requirement - SCA only
 	description = serializers.CharField(max_length=200, required=False, allow_blank=True)
-	
+
 	def validate(self, data):
 		request = self.context.get('request')
 		if not request or not request.user:
 			raise serializers.ValidationError("User context is required.")
-		
+
 		user = request.user
-		mpin = data.get('mpin')
-		
-		# Validate user's active wallet and MPIN
+		# mpin = data.get('mpin')  # MPIN removed - SCA only
+
+		# Validate user's active wallet (MPIN validation removed - SCA only)
 		try:
 			self.wallet = Wallet.objects.get(user=user, status='ACTIVE')
-			# !! SECURITY WARNING: Assumes self.wallet.mpin is appropriately handled (e.g., hashed) !!
-			if not self.wallet.mpin:
-				raise serializers.ValidationError("MPIN is not set for your wallet. Please set it first.")
-			# Direct comparison:
-			if mpin != self.wallet.mpin:
-				raise serializers.ValidationError("Invalid MPIN.")
+			# MPIN validation removed - SCA only authentication
+			# # !! SECURITY WARNING: Assumes self.wallet.mpin is appropriately handled (e.g., hashed) !!
+			# if not self.wallet.mpin:
+			#     raise serializers.ValidationError("MPIN is not set for your wallet. Please set it first.")
+			# # Direct comparison:
+			# if mpin != self.wallet.mpin:
+			#     raise serializers.ValidationError("Invalid MPIN.")
 		except Wallet.DoesNotExist:
 			raise serializers.ValidationError("No active wallet found for your account.")
 		except Wallet.MultipleObjectsReturned:
 			self.wallet = Wallet.objects.filter(user=user, status='ACTIVE').first()
 			if not self.wallet:
 				raise serializers.ValidationError("No active wallet found for your account.")
-			# Repeat MPIN check with direct comparison
-			# !! SECURITY WARNING: Assumes self.wallet.mpin is appropriately handled (e.g., hashed) !!
-			if not self.wallet.mpin:
-				raise serializers.ValidationError("MPIN is not set for your wallet. Please set it first.")
-			# Direct comparison:
-			if mpin != self.wallet.mpin:
-				raise serializers.ValidationError("Invalid MPIN.")
+			# MPIN validation removed - SCA only authentication
+			# # Repeat MPIN check with direct comparison
+			# # !! SECURITY WARNING: Assumes self.wallet.mpin is appropriately handled (e.g., hashed) !!
+			# if not self.wallet.mpin:
+			#     raise serializers.ValidationError("MPIN is not set for your wallet. Please set it first.")
+			# # Direct comparison:
+			# if mpin != self.wallet.mpin:
+			#     raise serializers.ValidationError("Invalid MPIN.")
 		
 		# Check if amount exceeds available balance (consider fees later if applicable)
 		if data['amount'] > self.wallet.available_balance:
@@ -438,12 +441,12 @@ class CreateBankBeneficiarySerializer(serializers.ModelSerializer):
 
 class WalletToBankTransferSerializer(serializers.Serializer):
 	"""Serializer for wallet to bank transfers (both PesaLink and EFT)."""
-	
+
 	TRANSFER_TYPES = [
 		('PESALINK', 'PesaLink Transfer'),
 		('EFT', 'Electronic Funds Transfer'),
 	]
-	
+
 	beneficiary_id = serializers.IntegerField(help_text="ID of the bank beneficiary")
 	amount = serializers.DecimalField(
 		max_digits=20, decimal_places=2, min_value=1, max_value=1000000
@@ -451,34 +454,36 @@ class WalletToBankTransferSerializer(serializers.Serializer):
 	transfer_type = serializers.ChoiceField(choices=TRANSFER_TYPES)
 	description = serializers.CharField(max_length=200, required=False, allow_blank=True)
 	reference = serializers.CharField(max_length=100, required=False, allow_blank=True)
-	mpin = serializers.CharField(write_only=True, min_length=4, max_length=6)
-	
+	# mpin = serializers.CharField(write_only=True, min_length=4, max_length=6)  # Removed MPIN requirement - SCA only
+
 	def validate(self, data):
 		request = self.context.get('request')
 		if not request or not request.user:
 			raise serializers.ValidationError("User context is required.")
-		
+
 		user = request.user
-		mpin = data.get('mpin')
+		# mpin = data.get('mpin')  # MPIN removed - SCA only
 		beneficiary_id = data.get('beneficiary_id')
-		
-		# Validate user's active wallet and MPIN
+
+		# Validate user's active wallet (MPIN validation removed - SCA only)
 		try:
 			self.wallet = Wallet.objects.get(user=user, status='ACTIVE')
-			if not self.wallet.mpin:
-				raise serializers.ValidationError("MPIN is not set for your wallet. Please set it first.")
-			if mpin != self.wallet.mpin:
-				raise serializers.ValidationError("Invalid MPIN.")
+			# MPIN validation removed - SCA only authentication
+			# if not self.wallet.mpin:
+			#     raise serializers.ValidationError("MPIN is not set for your wallet. Please set it first.")
+			# if mpin != self.wallet.mpin:
+			#     raise serializers.ValidationError("Invalid MPIN.")
 		except Wallet.DoesNotExist:
 			raise serializers.ValidationError("No active wallet found for your account.")
 		except Wallet.MultipleObjectsReturned:
 			self.wallet = Wallet.objects.filter(user=user, status='ACTIVE').first()
 			if not self.wallet:
 				raise serializers.ValidationError("No active wallet found for your account.")
-			if not self.wallet.mpin:
-				raise serializers.ValidationError("MPIN is not set for your wallet. Please set it first.")
-			if mpin != self.wallet.mpin:
-				raise serializers.ValidationError("Invalid MPIN.")
+			# MPIN validation removed - SCA only authentication
+			# if not self.wallet.mpin:
+			#     raise serializers.ValidationError("MPIN is not set for your wallet. Please set it first.")
+			# if mpin != self.wallet.mpin:
+			#     raise serializers.ValidationError("Invalid MPIN.")
 		
 		# Validate beneficiary belongs to user and is active
 		try:

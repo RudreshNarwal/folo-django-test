@@ -36,20 +36,6 @@ from ..tasks import schedule_transaction_timeout_check
 logger = logging.getLogger(__name__)
 
 
-# Helper function to extract SCA JWT from headers
-def get_sca_jwt_from_headers(headers):
-    """Extract SCA JWT from request headers."""
-    sca_jwt = headers.get('X-SCA-JWT')
-    if sca_jwt:
-        # Import SCAService to validate JWT
-        try:
-            from ..services.sca_service import SCAService
-            sca_service = SCAService()
-            if sca_service.validate_sca_jwt(sca_jwt):
-                return sca_jwt
-        except Exception as e:
-            logger.warning(f"Error validating SCA JWT: {e}")
-    return None
 
 
 # Event Manager Mixin
@@ -170,16 +156,9 @@ class WalletToWalletTransferAPIView(APIView):
             "fromWalletId": from_wallet_id,
             "toWalletId": to_wallet_id
         }
-        
-        # Check for SCA retry
-        sca_jwt = get_sca_jwt_from_headers(request.headers)
-        if sca_jwt:
-            # SCA retry - use upgraded JWT
-            dtb_service = DTBService()
-            dtb_service.headers['Authorization'] = f'Bearer {sca_jwt}'
-        else:
-            # Normal flow - use standard DTB service
-            dtb_service = DTBService()
+
+        # Always use standard DTB service (SCA JWT handling moved to /sca/upgrade-jwt/ endpoint)
+        dtb_service = DTBService()
 
         try:
             response_code = dtb_service.wallet_to_wallet_transfer(payload)
@@ -214,8 +193,29 @@ class WalletToWalletTransferAPIView(APIView):
                 }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         except DTBServiceSCAChallengeError as e:
-            # Handle SCA challenge
+            # Handle SCA challenge - save SCA session for later retry
             logger.info(f"SCA challenge detected for wallet transfer: {e}")
+
+            # Save SCA session for later retry
+            from ..models import SCASession
+            from django.utils import timezone
+
+            SCASession.objects.create(
+                user=request.user,
+                transaction=transaction,
+                intent_id=e.sca_challenge['intent_id'],
+                sca_type=e.sca_challenge['sca_type'],
+                transfer_type='WALLET_TO_WALLET',
+                transfer_payload={
+                    'amount': float(amount),
+                    'description': description,
+                    'externalUniqueId': str(external_unique_id),
+                    'fromWalletId': from_wallet_id,
+                    'toWalletId': to_wallet_id
+                },
+                expires_at=timezone.now() + timezone.timedelta(minutes=5)
+            )
+
             return Response({
                 "error": "SCA challenge required",
                 "sca_challenge": e.sca_challenge,
@@ -276,15 +276,8 @@ class WalletToMpesaTransferAPIView(TransactionEventManagerMixin, APIView):
         # Generate unique ID for the transaction
         external_unique_id = uuid.uuid4()
 
-        # Check for SCA retry
-        sca_jwt = get_sca_jwt_from_headers(request.headers)
-        if sca_jwt:
-            # SCA retry - use upgraded JWT
-            dtb_service = DTBService()
-            dtb_service.headers['Authorization'] = f'Bearer {sca_jwt}'
-        else:
-            # Normal flow - use standard DTB service
-            dtb_service = DTBService()
+        # Always use standard DTB service (SCA JWT handling moved to /sca/upgrade-jwt/ endpoint)
+        dtb_service = DTBService()
 
         # --- Perform Wallet-to-MPESA Transfer ---
         transaction_type = 'WALLET_TO_MPESA'
@@ -391,8 +384,31 @@ class WalletToMpesaTransferAPIView(TransactionEventManagerMixin, APIView):
                 }, status=status.HTTP_400_BAD_REQUEST)
 
         except DTBServiceSCAChallengeError as e:
-            # Handle SCA challenge
+            # Handle SCA challenge - save SCA session for later retry
             logger.info(f"SCA challenge detected for MPESA transfer: {e}")
+
+            # Save SCA session for later retry
+            from ..models import SCASession
+
+            SCASession.objects.create(
+                user=request.user,
+                transaction=transaction,
+                intent_id=e.sca_challenge['intent_id'],
+                sca_type=e.sca_challenge['sca_type'],
+                transfer_type='WALLET_TO_MPESA',
+                transfer_payload={
+                    'walletId': from_wallet_id,  # Store wallet ID separately
+                    'deliverToPhone': phone_number,
+                    'reference': reference,
+                    'amount': float(amount),
+                    'callbackUrl': callback_url,
+                    'description': final_description,
+                    'type': "KE_DTB_MPESA",
+                    'externalUniqueId': str(external_unique_id)
+                },
+                expires_at=timezone.now() + timezone.timedelta(minutes=5)
+            )
+
             return Response({
                 "error": "SCA challenge required",
                 "sca_challenge": e.sca_challenge,

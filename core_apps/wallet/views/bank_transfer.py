@@ -26,20 +26,6 @@ from ..tasks import schedule_transaction_timeout_check
 logger = logging.getLogger(__name__)
 
 
-# Helper function to extract SCA JWT from headers
-def get_sca_jwt_from_headers(headers):
-    """Extract SCA JWT from request headers."""
-    sca_jwt = headers.get('X-SCA-JWT')
-    if sca_jwt:
-        # Import SCAService to validate JWT
-        try:
-            from ..services.sca_service import SCAService
-            sca_service = SCAService()
-            if sca_service.validate_sca_jwt(sca_jwt):
-                return sca_jwt
-        except Exception as e:
-            logger.warning(f"Error validating SCA JWT: {e}")
-    return None
 
 
 class WalletToBankTransferAPIView(APIView):
@@ -92,15 +78,8 @@ class WalletToBankTransferAPIView(APIView):
             bank_beneficiary=beneficiary
         )
 
-        # Check for SCA retry
-        sca_jwt = get_sca_jwt_from_headers(request.headers)
-        if sca_jwt:
-            # SCA retry - use upgraded JWT
-            dtb_service = DTBService()
-            dtb_service.headers['Authorization'] = f'Bearer {sca_jwt}'
-        else:
-            # Normal flow - use standard DTB service
-            dtb_service = DTBService()
+        # Always use standard DTB service (SCA JWT handling moved to /sca/upgrade-jwt/ endpoint)
+        dtb_service = DTBService()
 
         callback_url = settings.BANK_TRANSFER_CALLBACK_URL
 
@@ -200,8 +179,22 @@ class WalletToBankTransferAPIView(APIView):
                 }, status=status.HTTP_400_BAD_REQUEST)
 
         except DTBServiceSCAChallengeError as e:
-            # Handle SCA challenge
+            # Handle SCA challenge - save SCA session for later retry
             logger.info(f"SCA challenge detected for bank transfer: {e}")
+
+            # Save SCA session for later retry
+            from ..models import SCASession
+
+            SCASession.objects.create(
+                user=request.user,
+                transaction=transaction,
+                intent_id=e.sca_challenge['intent_id'],
+                sca_type=e.sca_challenge['sca_type'],
+                transfer_type=transaction_type,
+                transfer_payload=payload,
+                expires_at=timezone.now() + timezone.timedelta(minutes=5)
+            )
+
             return Response({
                 "error": "SCA challenge required",
                 "sca_challenge": e.sca_challenge,

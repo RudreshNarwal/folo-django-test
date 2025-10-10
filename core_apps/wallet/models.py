@@ -396,3 +396,30 @@ class WalletMovementCallback(models.Model):
 	
 	def __str__(self):
 		return f"Webhook {self.dtb_transaction_id} - {self.transaction_type} ({self.amount})"
+
+
+class SCASession(GenericModel):
+	"""Track SCA challenges and pending transactions"""
+
+	user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sca_sessions')
+	transaction = models.ForeignKey(Transaction, on_delete=models.CASCADE, related_name='sca_sessions')
+	intent_id = models.CharField(max_length=100, unique=True)
+	sca_type = models.CharField(max_length=20, default='OTP')
+	status = models.CharField(max_length=20, default='PENDING',
+	                         choices=[('PENDING', 'Pending'), ('COMPLETED', 'Completed'), ('FAILED', 'Failed')])
+
+	# Store original transfer parameters for retry
+	transfer_type = models.CharField(max_length=30)  # WALLET_TO_WALLET, WALLET_TO_MPESA, etc.
+	transfer_payload = models.JSONField()  # Original request payload
+
+	expires_at = models.DateTimeField()
+
+	class Meta:
+		db_table = 'wallet_sca_session'
+		indexes = [
+			models.Index(fields=['intent_id']),
+			models.Index(fields=['user', 'status']),
+		]
+
+	def __str__(self):
+		return f"SCA Session {self.intent_id} for {self.user.mobile} - {self.status}"

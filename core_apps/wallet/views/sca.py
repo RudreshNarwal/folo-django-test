@@ -77,9 +77,13 @@ class SCAUpgradeJWTAPIView(APIView):
             payload = sca_session.transfer_payload
 
             if sca_session.transfer_type == 'WALLET_TO_WALLET':
-                response_code = dtb_service.wallet_to_wallet_transfer(payload)
+                # Construct the exact URL that was used in the original request
+                original_url = f'{dtb_service.BASE_URL}/tenants/{dtb_service.TENANT_ID}/wallets/transfers'
 
-                if response_code == 204:
+                # Make exact retry request using the cached upgraded JWT
+                response = dtb_service.retry_sca_request('POST', original_url, payload, intent_id)
+
+                if response.status_code == 204:
                     transaction.status = 'SUCCESSFUL'
                     transaction.save()
 
@@ -109,7 +113,7 @@ class SCAUpgradeJWTAPIView(APIView):
                     sca_session.save()
 
                     return Response({
-                        "error": f"Transfer failed with response code: {response_code}",
+                        "error": f"Transfer failed with response code: {response.status_code}",
                         "transaction_id": str(transaction.transaction_id)
                     }, status=status.HTTP_400_BAD_REQUEST)
 
@@ -117,18 +121,23 @@ class SCAUpgradeJWTAPIView(APIView):
                 wallet_id = payload.get('walletId')
                 mpesa_payload = {k: v for k, v in payload.items() if k != 'walletId'}
 
-                response = dtb_service.wallet_to_mpesa_transfer(wallet_id, mpesa_payload)
+                # Construct the exact URL that was used in the original request
+                original_url = f'{dtb_service.BASE_URL}/tenants/{dtb_service.TENANT_ID}/wallets/{wallet_id}/withdrawals'
 
-                if response.get('status') in ['SUCCESSFUL', 'PENDING']:
-                    transaction.status = response.get('status')
-                    transaction.withdrawal_id = response.get('withdrawalId')
-                    transaction.gateway = response.get('gateway')
-                    transaction.gateway_transaction_id = response.get('gatewayTransactionId')
-                    transaction.fee = response.get('fee', 0)
+                # Make exact retry request using the cached upgraded JWT
+                response = dtb_service.retry_sca_request('POST', original_url, mpesa_payload, intent_id)
+                response_data = response.json()
+
+                if response_data.get('status') in ['SUCCESSFUL', 'PENDING']:
+                    transaction.status = response_data.get('status')
+                    transaction.withdrawal_id = response_data.get('withdrawalId')
+                    transaction.gateway = response_data.get('gateway')
+                    transaction.gateway_transaction_id = response_data.get('gatewayTransactionId')
+                    transaction.fee = response_data.get('fee', 0)
 
                     if not transaction.extra_info:
                         transaction.extra_info = {}
-                    transaction.extra_info['initiation_response'] = response.get('extraInfo')
+                    transaction.extra_info['initiation_response'] = response_data.get('extraInfo')
                     transaction.save()
 
                     # Update wallet balance
@@ -143,7 +152,7 @@ class SCAUpgradeJWTAPIView(APIView):
                     sca_session.save()
 
                     return Response({
-                        "message": "MPESA withdrawal initiated successfully" if response.get('status') == 'SUCCESSFUL'
+                        "message": "MPESA withdrawal initiated successfully" if response_data.get('status') == 'SUCCESSFUL'
                                   else "MPESA withdrawal is being processed",
                         "transaction_id": str(transaction.transaction_id),
                         "withdrawal_id": transaction.withdrawal_id,
@@ -155,8 +164,8 @@ class SCAUpgradeJWTAPIView(APIView):
                     transaction.status = 'FAILED'
                     if not transaction.extra_info:
                         transaction.extra_info = {}
-                    if 'extraInfo' in response:
-                        transaction.extra_info['initiation_response'] = response.get('extraInfo')
+                    if 'extraInfo' in response_data:
+                        transaction.extra_info['initiation_response'] = response_data.get('extraInfo')
                     transaction.save()
 
                     sca_session.status = 'FAILED'
@@ -165,26 +174,33 @@ class SCAUpgradeJWTAPIView(APIView):
                     return Response({
                         "error": "MPESA withdrawal initiation failed",
                         "transaction_id": str(transaction.transaction_id),
-                        "status": response.get('status'),
-                        "details": response.get('extraInfo', response)
+                        "status": response_data.get('status'),
+                        "details": response_data.get('extraInfo', response_data)
                     }, status=status.HTTP_400_BAD_REQUEST)
 
             elif sca_session.transfer_type in ['WALLET_TO_PESALINK', 'WALLET_TO_BANK']:
                 wallet_id = payload.get('walletId')
                 bank_payload = {k: v for k, v in payload.items() if k != 'walletId'}
 
+                # Determine the correct endpoint based on transfer type
                 if sca_session.transfer_type == 'WALLET_TO_PESALINK':
-                    response = dtb_service.wallet_to_pesalink_transfer(wallet_id, bank_payload)
-                else:
-                    response = dtb_service.wallet_to_eft_transfer(wallet_id, bank_payload)
+                    # Construct the exact URL for PesaLink transfer
+                    original_url = f'{dtb_service.BASE_URL}/tenants/{dtb_service.TENANT_ID}/wallets/{wallet_id}/withdrawals'
+                else:  # WALLET_TO_BANK (EFT)
+                    # Construct the exact URL for EFT transfer
+                    original_url = f'{dtb_service.BASE_URL}/tenants/{dtb_service.TENANT_ID}/wallets/{wallet_id}/withdrawals'
 
-                if response.get('status') in ['SUCCESSFUL', 'PENDING']:
-                    transaction.status = response.get('status')
-                    transaction.withdrawal_id = response.get('withdrawalId')
-                    transaction.gateway = response.get('gateway')
-                    transaction.gateway_transaction_id = response.get('gatewayTransactionId')
-                    transaction.fee = response.get('fee', 0)
-                    transaction.extra_info = response.get('extraInfo')
+                # Make exact retry request using the cached upgraded JWT
+                response = dtb_service.retry_sca_request('POST', original_url, bank_payload, intent_id)
+                response_data = response.json()
+
+                if response_data.get('status') in ['SUCCESSFUL', 'PENDING']:
+                    transaction.status = response_data.get('status')
+                    transaction.withdrawal_id = response_data.get('withdrawalId')
+                    transaction.gateway = response_data.get('gateway')
+                    transaction.gateway_transaction_id = response_data.get('gatewayTransactionId')
+                    transaction.fee = response_data.get('fee', 0)
+                    transaction.extra_info = response_data.get('extraInfo')
                     transaction.save()
 
                     # Update wallet balance
@@ -210,8 +226,8 @@ class SCAUpgradeJWTAPIView(APIView):
                     }, status=status.HTTP_200_OK)
                 else:
                     transaction.status = 'FAILED'
-                    if 'extraInfo' in response:
-                        transaction.extra_info = response.get('extraInfo')
+                    if 'extraInfo' in response_data:
+                        transaction.extra_info = response_data.get('extraInfo')
                     transaction.save()
 
                     sca_session.status = 'FAILED'
@@ -220,8 +236,8 @@ class SCAUpgradeJWTAPIView(APIView):
                     return Response({
                         "error": f"{sca_session.transfer_type} transfer initiation failed",
                         "transaction_id": str(transaction.transaction_id),
-                        "status": response.get('status'),
-                        "details": response.get('extraInfo', response)
+                        "status": response_data.get('status'),
+                        "details": response_data.get('extraInfo', response_data)
                     }, status=status.HTTP_400_BAD_REQUEST)
 
         except SCASession.DoesNotExist:

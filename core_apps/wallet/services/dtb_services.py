@@ -163,10 +163,16 @@ class DTBService:
             if 'sessionId' in data:
                 self.session_id = data['sessionId']
             
+            # Cache the upgraded JWT for this intent
+            if not hasattr(self, '_sca_jwt_cache'):
+                self._sca_jwt_cache = {}
+            self._sca_jwt_cache['intent_id'] = intent_id
+            self._sca_jwt_cache['jwt'] = upgraded_jwt
+
             logger.info(f"JWT successfully upgraded for SCA intent: {intent_id}")
-            
+
             return upgraded_jwt
-            
+
         except HTTPError as http_err:
             resp = http_err.response
             logger.error(f"JWT upgrade failed: {resp.status_code} {resp.text}")
@@ -177,6 +183,57 @@ class DTBService:
         except Exception as e:
             logger.error(f"Unexpected error during JWT upgrade: {e}")
             raise DTBServiceError(f"Unexpected error during JWT upgrade: {e}")
+
+    def retry_sca_request(self, method, url, payload=None, intent_id=None):
+        """
+        Make an exact retry request for SCA-approved intent.
+        This bypasses retry logic to ensure exact match with original request.
+
+        Args:
+            method (str): HTTP method (POST, GET, etc.)
+            url (str): Exact URL that was used in original request
+            payload (dict): Exact payload that was used in original request
+            intent_id (str): The SCA intent ID (for logging and validation)
+
+        Returns:
+            requests.Response: The API response
+
+        Raises:
+            DTBServiceError: If no upgraded JWT found for the intent or request fails
+        """
+        logger.info(f"Making SCA retry request for intent: {intent_id}")
+        logger.debug(f"SCA retry: {method} {url}")
+
+        # Ensure we have the upgraded JWT for this intent
+        if not hasattr(self, '_sca_jwt_cache') or self._sca_jwt_cache.get('intent_id') != intent_id:
+            logger.error(f"No upgraded JWT found for intent: {intent_id}")
+            raise DTBServiceError(f"No upgraded JWT found for intent: {intent_id}")
+
+        # Use the upgraded JWT from cache
+        upgraded_jwt = self._sca_jwt_cache['jwt']
+        headers = self.headers.copy()
+        headers['Authorization'] = f'Bearer {upgraded_jwt}'
+
+        try:
+            if method.upper() == 'POST':
+                if payload is not None:
+                    response = self.session.post(url, json=payload, headers=headers, timeout=10, verify=True)
+                else:
+                    response = self.session.post(url, headers=headers, timeout=10, verify=True)
+            elif method.upper() == 'GET':
+                response = self.session.get(url, headers=headers, timeout=10, verify=True)
+            else:
+                raise DTBServiceError(f"Unsupported HTTP method for SCA retry: {method}")
+
+            logger.info(f"SCA retry completed with status: {response.status_code}")
+            return response
+
+        except (RequestException, Timeout) as err:
+            logger.error(f"SCA retry request failed: {err}")
+            raise DTBServiceError(f"SCA retry request failed: {err}")
+        except Exception as e:
+            logger.error(f"Unexpected error during SCA retry: {e}")
+            raise DTBServiceError(f"Unexpected error during SCA retry: {e}")
 
     def request_with_retries(self, method, url, **kwargs):
         """

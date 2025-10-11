@@ -213,6 +213,7 @@ class WalletToWalletTransferAPIView(APIView):
                     'fromWalletId': from_wallet_id,
                     'toWalletId': to_wallet_id
                 },
+                original_dtb_jwt=dtb_service.jwt_token,  # Store the JWT that was used for the original request
                 expires_at=timezone.now() + timezone.timedelta(minutes=5)
             )
 
@@ -406,6 +407,7 @@ class WalletToMpesaTransferAPIView(TransactionEventManagerMixin, APIView):
                     'type': "KE_DTB_MPESA",
                     'externalUniqueId': str(external_unique_id)
                 },
+                original_dtb_jwt=dtb_service.jwt_token,  # Store the JWT that was used for the original request
                 expires_at=timezone.now() + timezone.timedelta(minutes=5)
             )
 

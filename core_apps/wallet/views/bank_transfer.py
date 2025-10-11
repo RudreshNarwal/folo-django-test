@@ -185,13 +185,18 @@ class WalletToBankTransferAPIView(APIView):
             # Save SCA session for later retry
             from ..models import SCASession
 
+            # Add wallet ID to payload for retry
+            payload_with_wallet = payload.copy()
+            payload_with_wallet['walletId'] = from_wallet.wallet_id
+
             SCASession.objects.create(
                 user=request.user,
                 transaction=transaction,
                 intent_id=e.sca_challenge['intent_id'],
                 sca_type=e.sca_challenge['sca_type'],
                 transfer_type=transaction_type,
-                transfer_payload=payload,
+                transfer_payload=payload_with_wallet,
+                original_dtb_jwt=dtb_service.jwt_token,  # Store the JWT that was used for the original request
                 expires_at=timezone.now() + timezone.timedelta(minutes=5)
             )
 

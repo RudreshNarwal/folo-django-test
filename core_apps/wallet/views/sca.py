@@ -63,16 +63,35 @@ class SCAUpgradeJWTAPIView(APIView):
                 status='PENDING'
             )
 
-            # 2. Create DTB service and upgrade JWT for SCA
-            # This calls PUT /authentication/jwt with intentId, current JWT, and OTP
-            # The upgraded JWT is bound to this specific intent for the original request
+            # 2. Use the ORIGINAL JWT from the SCA session (not a new one!)
+            # The DTB API requires the JWT upgrade to use the SAME JWT that made the original request
+            original_jwt = sca_session.original_dtb_jwt
+
+            if not original_jwt:
+                logger.error(f"No original JWT found in SCA session for intent: {intent_id}")
+                sca_session.status = 'FAILED'
+                sca_session.save()
+                return Response({
+                    "error": "Invalid SCA session - missing original JWT",
+                    "details": "The original JWT token was not stored with this SCA session",
+                    "transaction_id": str(transaction.transaction_id)
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # 3. Create DTB service but use the original JWT (not a fresh authentication)
+            # This is CRUCIAL: We must use the same JWT that made the original request
             dtb_service = DTBService()
+            # Override with the original JWT instead of the newly authenticated one
+            dtb_service.jwt_token = original_jwt
+            dtb_service.headers['Authorization'] = f'Bearer {original_jwt}'
+
+            # 4. Now upgrade using the SAME JWT that made the original request
+            # This calls PUT /authentication/jwt with intentId, original JWT, and OTP
             upgraded_jwt = dtb_service.upgrade_jwt_for_sca(intent_id, otp)
             
             # JWT is now upgraded and ready to retry the original transaction
             # Note: The upgraded JWT can only be used to resubmit the IDENTICAL original request
 
-            # 3. Retry original transfer based on type
+            # 5. Retry original transfer based on type
             transaction = sca_session.transaction
             payload = sca_session.transfer_payload
 

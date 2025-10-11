@@ -411,6 +411,11 @@ class SCASession(GenericModel):
 	# Store original transfer parameters for retry
 	transfer_type = models.CharField(max_length=30)  # WALLET_TO_WALLET, WALLET_TO_MPESA, etc.
 	transfer_payload = models.JSONField()  # Original request payload
+	
+	# Store the original DTB JWT that was used for the request that triggered SCA
+	# This is crucial because DTB requires the upgraded JWT to be based on the SAME JWT
+	# that made the original request (not a new JWT from a fresh authentication)
+	original_dtb_jwt = models.TextField(null=True, blank=True, help_text='Original DTB JWT used for the request that triggered SCA')
 
 	expires_at = models.DateTimeField()
 

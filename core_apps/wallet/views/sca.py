@@ -7,7 +7,6 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from ..models import SCASession, Transaction
-from ..services.sca_service import SCAService, SCAServiceError
 from ..services.dtb_services import (
     DTBService,
     DTBServiceError,
@@ -52,6 +51,10 @@ class SCAUpgradeJWTAPIView(APIView):
         intent_id = serializer.validated_data['intent_id']
         otp = serializer.validated_data['otp']
 
+        # Initialize variables for error handling
+        sca_session = None
+        transaction = None
+
         try:
             # 1. Get SCA session
             sca_session = SCASession.objects.get(
@@ -60,23 +63,16 @@ class SCAUpgradeJWTAPIView(APIView):
                 status='PENDING'
             )
 
-            # 2. Get current JWT from a new DTB service instance
-            # The DTB API needs the current JWT to know which session to upgrade
-            dtb_service_temp = DTBService()
-            current_jwt = dtb_service_temp.jwt_token
-
-            # 3. Upgrade DTB JWT with current JWT context
-            # This calls the /authentication/upgrade-jwt endpoint with Authorization header
-            sca_service = SCAService()
-            jwt_data = sca_service.upgrade_jwt(intent_id, otp, current_jwt=current_jwt)
-            upgraded_jwt = jwt_data['jwt_token']
-
-            # 4. Create DTB service with upgraded JWT
+            # 2. Create DTB service and upgrade JWT for SCA
+            # This calls PUT /authentication/jwt with intentId, current JWT, and OTP
+            # The upgraded JWT is bound to this specific intent for the original request
             dtb_service = DTBService()
-            dtb_service.jwt_token = upgraded_jwt
-            dtb_service.headers['Authorization'] = f'Bearer {upgraded_jwt}'
+            upgraded_jwt = dtb_service.upgrade_jwt_for_sca(intent_id, otp)
+            
+            # JWT is now upgraded and ready to retry the original transaction
+            # Note: The upgraded JWT can only be used to resubmit the IDENTICAL original request
 
-            # 5. Retry original transfer based on type
+            # 3. Retry original transfer based on type
             transaction = sca_session.transaction
             payload = sca_session.transfer_payload
 
@@ -235,17 +231,7 @@ class SCAUpgradeJWTAPIView(APIView):
                 "details": "SCA session not found or already completed"
             }, status=status.HTTP_404_NOT_FOUND)
 
-        except SCAServiceError as e:
-            logger.error(f"SCA JWT upgrade failed: {e}")
-            if sca_session:
-                sca_session.status = 'FAILED'
-                sca_session.save()
-            return Response({
-                "error": "JWT upgrade failed",
-                "details": str(e)
-            }, status=status.HTTP_400_BAD_REQUEST)
-
-        except (DTBServiceAuthenticationError, DTBServiceAPIError) as e:
+        except (DTBServiceAuthenticationError, DTBServiceAPIError, DTBServiceError) as e:
             logger.error(f"DTB API Error during SCA retry: {e}")
             if transaction:
                 transaction.status = 'FAILED'

@@ -1,19 +1,12 @@
 import requests
 import logging
 import time
+import re
 
 from django.conf import settings
 from requests.exceptions import HTTPError, RequestException, Timeout
 
 logger = logging.getLogger(__name__)
-
-# Import SCA service for handling SCA challenges
-try:
-    from ..services.sca_service import SCAService, SCAServiceError
-except ImportError:
-    logger.warning("SCA service not available - SCA functionality will be disabled")
-    SCAService = None
-    SCAServiceError = Exception
 
 
 class DTBService:
@@ -80,6 +73,111 @@ class DTBService:
             logger.error(f"JWT renewal failed: {e}")
             raise DTBServiceError(f"JWT renewal failed: {e}")
 
+    def parse_sca_challenge(self, response):
+        """
+        Parse SCA challenge from DTB 403 response headers.
+        
+        Args:
+            response: requests.Response object from DTB API call
+            
+        Returns:
+            dict: SCA challenge details or None if not an SCA response
+        """
+        if response.status_code != 403:
+            return None
+        
+        sca_header = response.headers.get('SCA')
+        if not sca_header:
+            return None
+        
+        # Parse header format: "SCA id=84b479c1edaa44d8b15a473614a24438;type=OTP"
+        intent_id_match = re.search(r'id=([^;]+)', sca_header)
+        type_match = re.search(r'type=([^;]+)', sca_header)
+        
+        if not intent_id_match:
+            logger.warning(f"Could not parse intent_id from SCA header: {sca_header}")
+            return None
+        
+        return {
+            'requires_sca': True,
+            'intent_id': intent_id_match.group(1),
+            'sca_type': type_match.group(1) if type_match else 'OTP',
+            'header': sca_header
+        }
+
+    def upgrade_jwt_for_sca(self, intent_id, otp):
+        """
+        Upgrade JWT using SCA credentials (OTP verification).
+        Based on DTB API documentation for SCA step-up authentication.
+        
+        The upgraded JWT is specifically bound to the intent and can only be used
+        to resubmit the original request (with IDENTICAL path and body).
+        
+        Note: The upgraded JWT must be used within 3 minutes of the SCA challenge.
+        
+        Args:
+            intent_id (str): SCA intent ID from challenge response header
+            otp (str): One-time password from user (use "911911" in sandbox)
+            
+        Returns:
+            str: Upgraded JWT token
+            
+        Raises:
+            DTBServiceError: If JWT upgrade fails
+        """
+        # Correct endpoint from DTB documentation: PUT /authentication/jwt
+        url = f'{self.BASE_URL}/authentication/jwt'
+        
+        # Payload format from documentation
+        payload = {
+            "intentId": intent_id,
+            "jwt": self.jwt_token,  # Current JWT
+            "otp": otp
+        }
+        
+        try:
+            logger.info(f"Upgrading JWT for SCA with intentId: {intent_id}")
+            logger.debug(f"SCA upgrade request payload: {{'intentId': '{intent_id}', 'jwt': '***', 'otp': '***'}}")
+            
+            # Use PUT method as per DTB documentation
+            response = self.session.put(
+                url,
+                json=payload,
+                headers=self.headers,
+                timeout=10,
+                verify=True
+            )
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            if 'headerValue' not in data:
+                raise DTBServiceError("Invalid response from DTB auth service: missing headerValue")
+            
+            # Extract upgraded JWT
+            upgraded_jwt = data['headerValue'].split(' ')[1]
+            
+            # Update internal state with upgraded JWT
+            self.jwt_token = upgraded_jwt
+            self.headers['Authorization'] = data['headerValue']
+            if 'sessionId' in data:
+                self.session_id = data['sessionId']
+            
+            logger.info(f"JWT successfully upgraded for SCA intent: {intent_id}")
+            
+            return upgraded_jwt
+            
+        except HTTPError as http_err:
+            resp = http_err.response
+            logger.error(f"JWT upgrade failed: {resp.status_code} {resp.text}")
+            raise DTBServiceError(f"JWT upgrade failed: {resp.status_code} {resp.text}")
+        except (RequestException, Timeout) as err:
+            logger.error(f"JWT upgrade request failed: {err}")
+            raise DTBServiceError(f"JWT upgrade request failed: {err}")
+        except Exception as e:
+            logger.error(f"Unexpected error during JWT upgrade: {e}")
+            raise DTBServiceError(f"Unexpected error during JWT upgrade: {e}")
+
     def request_with_retries(self, method, url, **kwargs):
         """
         Generic request method with retries, JWT renewal on 401, and SCA challenge handling on 403.
@@ -105,10 +203,9 @@ class DTBService:
                     except DTBServiceAuthenticationError:
                         # Cannot renew JWT; re-raise
                         raise
-                elif resp.status_code == 403 and SCAService:
+                elif resp.status_code == 403:
                     # Check if this is an SCA challenge
-                    sca_service = SCAService()
-                    sca_challenge = sca_service.parse_sca_challenge(resp)
+                    sca_challenge = self.parse_sca_challenge(resp)
                     if sca_challenge:
                         logger.debug(f"SCA challenge detected: {sca_challenge}")
                         raise DTBServiceSCAChallengeError(

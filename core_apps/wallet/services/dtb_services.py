@@ -226,6 +226,24 @@ class DTBService:
                 raise DTBServiceError(f"Unsupported HTTP method for SCA retry: {method}")
 
             logger.info(f"SCA retry completed with status: {response.status_code}")
+            
+            # Check for error status codes
+            if response.status_code >= 400:
+                error_body = response.text
+                try:
+                    error_data = response.json()
+                    # Handle list format errors from DTB API
+                    if isinstance(error_data, list) and len(error_data) > 0:
+                        error_msg = error_data[0].get('description', 'Unknown error')
+                    else:
+                        error_msg = error_data.get('description', 'Unknown error')
+                except:
+                    error_msg = error_body
+                    error_data = None
+                
+                logger.error(f"SCA retry failed with {response.status_code}: {error_msg}")
+                raise DTBServiceAPIError(response.status_code, error_msg, error_details=error_data)
+            
             return response
 
         except (RequestException, Timeout) as err:

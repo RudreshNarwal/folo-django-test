@@ -15,12 +15,13 @@ class DTBService:
     USERNAME = 'kmburu'
     PASSWORD = 'ubuntU*2023'
 
-    def __init__(self):
+    def __init__(self, skip_auth=False):
         self.session = requests.Session()
         self.jwt_token = None
         self.session_id = None
         self.headers = {'Content-Type': 'application/json'}
-        self.authenticate()
+        if not skip_auth:
+            self.authenticate()
 
     def authenticate(self):
         """

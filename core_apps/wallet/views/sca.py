@@ -60,17 +60,23 @@ class SCAUpgradeJWTAPIView(APIView):
                 status='PENDING'
             )
 
-            # 2. Upgrade DTB JWT
+            # 2. Get current JWT from a new DTB service instance
+            # The DTB API needs the current JWT to know which session to upgrade
+            dtb_service_temp = DTBService()
+            current_jwt = dtb_service_temp.jwt_token
+
+            # 3. Upgrade DTB JWT with current JWT context
+            # This calls the /authentication/upgrade-jwt endpoint with Authorization header
             sca_service = SCAService()
-            jwt_data = sca_service.upgrade_jwt(intent_id, otp)
+            jwt_data = sca_service.upgrade_jwt(intent_id, otp, current_jwt=current_jwt)
             upgraded_jwt = jwt_data['jwt_token']
 
-            # 3. Create DTB service with upgraded JWT
+            # 4. Create DTB service with upgraded JWT
             dtb_service = DTBService()
             dtb_service.jwt_token = upgraded_jwt
             dtb_service.headers['Authorization'] = f'Bearer {upgraded_jwt}'
 
-            # 4. Retry original transfer based on type
+            # 5. Retry original transfer based on type
             transaction = sca_session.transaction
             payload = sca_session.transfer_payload
 

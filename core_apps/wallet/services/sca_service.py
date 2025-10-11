@@ -51,13 +51,14 @@ class SCAService:
             'header': sca_header
         }
 
-    def upgrade_jwt(self, intent_id, otp):
+    def upgrade_jwt(self, intent_id, otp, current_jwt=None):
         """
         Upgrade JWT using SCA credentials.
 
         Args:
             intent_id (str): SCA intent ID from challenge
             otp (str): One-time password from user
+            current_jwt (str, optional): Current JWT token to be upgraded
 
         Returns:
             dict: Upgraded JWT details
@@ -72,11 +73,21 @@ class SCAService:
             "otp": otp
         }
 
+        # Prepare headers with current JWT if provided
+        headers = self.headers.copy()
+        if current_jwt:
+            headers['Authorization'] = f'Bearer {current_jwt}'
+            logger.debug(f"Upgrading JWT with Authorization header included")
+        else:
+            logger.warning(f"Upgrading JWT without current JWT - this may cause 404 error")
+
         try:
+            logger.info(f"Calling upgrade-jwt endpoint: {url} with intentId: {intent_id}")
+            logger.debug(f"Request headers: {headers}")
             response = self.session.post(
                 url,
                 json=payload,
-                headers=self.headers,
+                headers=headers,
                 timeout=10,
                 verify=True
             )

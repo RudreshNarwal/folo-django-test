@@ -77,18 +77,12 @@ class SCAUpgradeJWTAPIView(APIView):
                     "transaction_id": str(transaction.transaction_id)
                 }, status=status.HTTP_400_BAD_REQUEST)
 
-            # 3. Create DTB service WITHOUT authentication (to avoid getting a new JWT)
+            # 3. Create DTB service but use the original JWT (not a fresh authentication)
             # This is CRUCIAL: We must use the same JWT that made the original request
-            # The DTB API verifies the body is an EXACT match to the initial call
-            dtb_service = DTBService(skip_auth=True)
-            
-            # Set up with the original JWT (no new authentication)
+            dtb_service = DTBService()
+            # Override with the original JWT instead of the newly authenticated one
             dtb_service.jwt_token = original_jwt
-            dtb_service.headers = {
-                'Content-Type': 'application/json',
-                'Authorization': f'Bearer {original_jwt}'
-            }
-            dtb_service.session_id = None  # We don't have the original session_id
+            dtb_service.headers['Authorization'] = f'Bearer {original_jwt}'
 
             # 4. Now upgrade using the SAME JWT that made the original request
             # This calls PUT /authentication/jwt with intentId, original JWT, and OTP
@@ -100,8 +94,6 @@ class SCAUpgradeJWTAPIView(APIView):
             # 5. Retry original transfer based on type
             transaction = sca_session.transaction
             payload = sca_session.transfer_payload
-
-            print('Calling withdrawal retry')
 
             if sca_session.transfer_type == 'WALLET_TO_WALLET':
                 # Construct the exact URL that was used in the original request

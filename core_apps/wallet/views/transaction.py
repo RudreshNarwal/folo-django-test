@@ -31,6 +31,7 @@ from ..services.dtb_services import (
     DTBServiceAPIError,
     DTBServiceSCAChallengeError,
 )
+from ..utils.payload_ordering import create_mpesa_payload, create_wallet_to_wallet_payload
 from ..tasks import schedule_transaction_timeout_check
 
 logger = logging.getLogger(__name__)
@@ -148,14 +149,14 @@ class WalletToWalletTransferAPIView(APIView):
             5  # 5 minutes timeout
         )
         
-        # Prepare payload for DTB service
-        payload = {
-            "amount": float(amount),
-            "description": description,
-            "externalUniqueId": str(external_unique_id),
-            "fromWalletId": from_wallet_id,
-            "toWalletId": to_wallet_id
-        }
+        # Prepare payload for DTB service using canonical key ordering
+        payload = create_wallet_to_wallet_payload(
+            amount=amount,
+            description=description,
+            external_unique_id=external_unique_id,
+            from_wallet_id=from_wallet_id,
+            to_wallet_id=to_wallet_id
+        )
 
         # Always use standard DTB service (SCA JWT handling moved to /sca/upgrade-jwt/ endpoint)
         dtb_service = DTBService()
@@ -302,17 +303,16 @@ class WalletToMpesaTransferAPIView(TransactionEventManagerMixin, APIView):
             contact=contact # Link to contact
         )
 
-        # Prepare payload for DTB service
+        # Prepare payload for DTB service using canonical key ordering
         callback_url = settings.WALLET_WITHDRAWAL_CALLBACK_URL
-        payload = {
-            "deliverToPhone": phone_number,
-            "reference": reference,
-            "amount": float(amount),
-            "callbackUrl": callback_url,
-            "description": final_description,
-            "type": "KE_DTB_MPESA",
-            "externalUniqueId": str(external_unique_id)
-        }
+        payload = create_mpesa_payload(
+            deliver_to_phone=phone_number,
+            reference=reference,
+            amount=amount,
+            callback_url=callback_url,
+            description=final_description,
+            external_unique_id=external_unique_id
+        )
 
         try:
             response = dtb_service.wallet_to_mpesa_transfer(from_wallet_id, payload)

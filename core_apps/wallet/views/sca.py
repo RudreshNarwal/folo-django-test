@@ -14,6 +14,7 @@ from ..services.dtb_services import (
     DTBServiceAPIError,
     DTBServiceSCAChallengeError,
 )
+from ..utils.payload_ordering import restore_payload_order
 from ..serializers import SCAUpgradeSerializer
 
 logger = logging.getLogger(__name__)
@@ -96,6 +97,10 @@ class SCAUpgradeJWTAPIView(APIView):
             payload = sca_session.transfer_payload
 
             if sca_session.transfer_type == 'WALLET_TO_WALLET':
+                # Restore canonical payload order for wallet-to-wallet transfer
+                payload = restore_payload_order(payload, sca_session.transfer_type)
+                logger.info(f'Restored WALLET_TO_WALLET payload type: {type(payload).__name__}')
+                logger.info(f'Restored WALLET_TO_WALLET payload keys: {list(payload.keys())}')
                 # Construct the exact URL that was used in the original request
                 original_url = f'{dtb_service.BASE_URL}/tenants/{dtb_service.TENANT_ID}/wallets/transfers'
 
@@ -150,8 +155,14 @@ class SCAUpgradeJWTAPIView(APIView):
                     }, status=status.HTTP_400_BAD_REQUEST)
 
             elif sca_session.transfer_type == 'WALLET_TO_MPESA':
+                # Extract walletId FIRST (it's metadata, not part of the DTB payload)
                 wallet_id = payload.get('walletId')
                 mpesa_payload = {k: v for k, v in payload.items() if k != 'walletId'}
+                
+                # NOW restore canonical payload order (without walletId)
+                mpesa_payload = restore_payload_order(mpesa_payload, sca_session.transfer_type)
+                logger.info(f'Restored WALLET_TO_MPESA payload type: {type(mpesa_payload).__name__}')
+                logger.info(f'Restored WALLET_TO_MPESA payload keys: {list(mpesa_payload.keys())}')
 
                 # Construct the exact URL that was used in the original request
                 original_url = f'{dtb_service.BASE_URL}/tenants/{dtb_service.TENANT_ID}/wallets/{wallet_id}/withdrawals'
@@ -224,8 +235,14 @@ class SCAUpgradeJWTAPIView(APIView):
                     }, status=status.HTTP_400_BAD_REQUEST)
 
             elif sca_session.transfer_type in ['WALLET_TO_PESALINK', 'WALLET_TO_BANK']:
+                # Extract walletId FIRST (it's metadata, not part of the DTB payload)
                 wallet_id = payload.get('walletId')
                 bank_payload = {k: v for k, v in payload.items() if k != 'walletId'}
+                
+                # NOW restore canonical payload order (without walletId)
+                bank_payload = restore_payload_order(bank_payload, sca_session.transfer_type)
+                logger.info(f'Restored {sca_session.transfer_type} payload type: {type(bank_payload).__name__}')
+                logger.info(f'Restored {sca_session.transfer_type} payload keys: {list(bank_payload.keys())}')
 
                 # Determine the correct endpoint based on transfer type
                 if sca_session.transfer_type == 'WALLET_TO_PESALINK':

@@ -2,6 +2,8 @@ import requests
 import logging
 import time
 import re
+import json
+from collections import OrderedDict
 
 from django.conf import settings
 from requests.exceptions import HTTPError, RequestException, Timeout
@@ -215,6 +217,10 @@ class DTBService:
         headers['Authorization'] = f'Bearer {upgraded_jwt}'
 
         try:
+            # Log OrderedDict payload for SCA retry debugging
+            if payload is not None and isinstance(payload, OrderedDict):
+                logger.info(f'SCA retry with OrderedDict keys: {list(payload.keys())}')
+            
             if method.upper() == 'POST':
                 if payload is not None:
                     response = self.session.post(url, json=payload, headers=headers, timeout=10, verify=True)
@@ -241,7 +247,7 @@ class DTBService:
                     error_msg = error_body
                     error_data = None
                 
-                logger.error(f"SCA retry failed with {response.status_code}: {error_msg}")
+                logger.error(f"SCA retry failed with {response.status_code}: {error_msg} {error_data}")
                 raise DTBServiceAPIError(response.status_code, error_msg, error_details=error_data)
             
             return response
@@ -262,6 +268,10 @@ class DTBService:
 
         for attempt in range(max_retries):
             try:
+                # Log OrderedDict payload for debugging
+                if 'json' in kwargs and isinstance(kwargs['json'], OrderedDict):
+                    logger.info(f'Sending OrderedDict payload with keys: {list(kwargs["json"].keys())}')
+                
                 response = self.session.request(method, url, timeout=10, **kwargs)
                 response.raise_for_status()
                 return response

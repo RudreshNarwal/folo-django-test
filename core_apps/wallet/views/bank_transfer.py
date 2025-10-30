@@ -21,6 +21,7 @@ from ..services.dtb_services import (
     DTBServiceAPIError,
     DTBServiceSCAChallengeError,
 )
+from ..utils.payload_ordering import create_pesalink_payload, create_eft_payload
 from ..tasks import schedule_transaction_timeout_check
 
 logger = logging.getLogger(__name__)
@@ -83,34 +84,30 @@ class WalletToBankTransferAPIView(APIView):
 
         callback_url = settings.BANK_TRANSFER_CALLBACK_URL
 
+        # Prepare payload using canonical key ordering
         if transfer_type == 'PESALINK':
-            payload = {
-                "amount": float(amount),
-                "type": "KE_DTB_PESALINK",
-                "description": description,
-                "externalUniqueId": str(external_unique_id),
-                "accountNumber": beneficiary.account_number,
-                "branchCode": beneficiary.branch_code,
-                "accountCurrency": "KES",
-                "bank": beneficiary.bank_code,
-                "reference": reference,
-                "callbackUrl": callback_url
-            }
+            payload = create_pesalink_payload(
+                amount=amount,
+                description=description,
+                external_unique_id=external_unique_id,
+                account_number=beneficiary.account_number,
+                branch_code=beneficiary.branch_code,
+                bank_code=beneficiary.bank_code,
+                reference=reference,
+                callback_url=callback_url
+            )
         else:  # EFT
-            payload = {
-                "accountName": beneficiary.account_holder_name,
-                "accountNumber": beneficiary.account_number,
-                "branchCode": beneficiary.branch_code,
-                "bankCode": beneficiary.bank_code,
-                "amount": float(amount),
-                "callbackUrl": callback_url,
-                "description": description,
-                "externalUniqueId": str(external_unique_id),
-                "location": "kenya",
-                "reference": reference,
-                "type": "KE_DTB_EFT",
-                "currency": "KES"
-            }
+            payload = create_eft_payload(
+                account_name=beneficiary.account_holder_name,
+                account_number=beneficiary.account_number,
+                branch_code=beneficiary.branch_code,
+                bank_code=beneficiary.bank_code,
+                amount=amount,
+                callback_url=callback_url,
+                description=description,
+                external_unique_id=external_unique_id,
+                reference=reference
+            )
 
         try:
             if transfer_type == 'PESALINK':
@@ -348,4 +345,4 @@ class GetBankTransferFeeAPIView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             logger.error(f"Unexpected error getting bank transfer fee: {e}")
-            return Response({"error": "An unexpected error occurred"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR) 
+            return Response({"error": "An unexpected error occurred"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

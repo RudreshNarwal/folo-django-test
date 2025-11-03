@@ -113,7 +113,8 @@ class SCAUpgradeJWTAPIView(APIView):
                         transaction.save()
 
                         # Update wallet balance
-                        wallet_details = dtb_service.get_wallet_details(payload['fromWalletId'])
+                        dtb_service2 = DTBService()
+                        wallet_details = dtb_service2.get_wallet_details(payload['fromWalletId'])
                         from_wallet = transaction.from_wallet
                         from_wallet.available_balance = wallet_details['availableBalance']
                         from_wallet.current_balance = wallet_details['currentBalance']
@@ -185,7 +186,8 @@ class SCAUpgradeJWTAPIView(APIView):
                         transaction.save()
 
                         # Update wallet balance
-                        wallet_details = dtb_service.get_wallet_details(wallet_id)
+                        dtb_service2 = DTBService()
+                        wallet_details = dtb_service2.get_wallet_details(wallet_id)
                         from_wallet = transaction.from_wallet
                         from_wallet.available_balance = wallet_details['availableBalance']
                         from_wallet.current_balance = wallet_details['currentBalance']
@@ -267,7 +269,8 @@ class SCAUpgradeJWTAPIView(APIView):
                         transaction.save()
 
                         # Update wallet balance
-                        wallet_details = dtb_service.get_wallet_details(wallet_id)
+                        dtb_service2 = DTBService()
+                        wallet_details = dtb_service2.get_wallet_details(wallet_id)
                         from_wallet = transaction.from_wallet
                         from_wallet.available_balance = wallet_details['availableBalance']
                         from_wallet.current_balance = wallet_details['currentBalance']

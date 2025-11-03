@@ -203,9 +203,6 @@ class DTBService:
         Raises:
             DTBServiceError: If no upgraded JWT found for the intent or request fails
         """
-        logger.info(f"Making SCA retry request for intent: {intent_id}")
-        logger.debug(f"SCA retry: {method} {url}")
-
         # Ensure we have the upgraded JWT for this intent
         if not hasattr(self, '_sca_jwt_cache') or self._sca_jwt_cache.get('intent_id') != intent_id:
             logger.error(f"No upgraded JWT found for intent: {intent_id}")
@@ -216,10 +213,20 @@ class DTBService:
         headers = self.headers.copy()
         headers['Authorization'] = f'Bearer {upgraded_jwt}'
 
+        # === COMPREHENSIVE LOGGING FOR SCA RETRY ===
+        logger.info(f"=== SCA RETRY REQUEST START ===")
+        logger.info(f"Intent ID: {intent_id}")
+        logger.info(f"HTTP Method: {method.upper()}")
+        logger.info(f"URL: {url}")
+        logger.info(f"Has Payload: {payload is not None}")
+        if payload is not None:
+            logger.info(f"Payload Type: {type(payload).__name__}")
+            logger.info(f"Payload Keys: {list(payload.keys()) if hasattr(payload, 'keys') else 'N/A'}")
+            logger.info(f"Payload Content: {payload}")
+        logger.info(f"Headers: {{'Authorization': 'Bearer ***', 'Content-Type': '{headers.get('Content-Type', 'N/A')}'}}")
+        logger.info(f"=== SCA RETRY REQUEST END ===")
+
         try:
-            # Log OrderedDict payload for SCA retry debugging
-            if payload is not None and isinstance(payload, OrderedDict):
-                logger.info(f'SCA retry with OrderedDict keys: {list(payload.keys())}')
             
             if method.upper() == 'POST':
                 if payload is not None:

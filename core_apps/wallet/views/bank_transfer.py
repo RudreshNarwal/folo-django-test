@@ -83,7 +83,6 @@ class WalletToBankTransferAPIView(APIView):
         dtb_service = DTBService()
 
         callback_url = settings.BANK_TRANSFER_CALLBACK_URL
-
         # Prepare payload using canonical key ordering
         if transfer_type == 'PESALINK':
             payload = create_pesalink_payload(
@@ -126,7 +125,19 @@ class WalletToBankTransferAPIView(APIView):
                 transaction.gateway = response.get('gateway')
                 transaction.gateway_transaction_id = response.get('gatewayTransactionId')
                 transaction.fee = response.get('fee', 0)
-                transaction.extra_info = response.get('extraInfo')
+                
+                # Parse extra_info if it's a JSON string, otherwise use as-is
+                extra_info = response.get('extraInfo')
+                if extra_info:
+                    if isinstance(extra_info, str):
+                        import json
+                        try:
+                            transaction.extra_info = json.loads(extra_info)
+                        except json.JSONDecodeError:
+                            transaction.extra_info = {'raw': extra_info}
+                    else:
+                        transaction.extra_info = extra_info
+                
                 transaction.save()
 
                 # Schedule timeout check for this transaction (5 minutes)
@@ -164,8 +175,19 @@ class WalletToBankTransferAPIView(APIView):
             else:
                 # Handle failed transaction initiation
                 transaction.status = 'FAILED'
-                if 'extraInfo' in response:
-                    transaction.extra_info = response.get('extraInfo')
+                
+                # Parse extra_info if it's a JSON string
+                extra_info = response.get('extraInfo')
+                if extra_info:
+                    if isinstance(extra_info, str):
+                        import json
+                        try:
+                            transaction.extra_info = json.loads(extra_info)
+                        except json.JSONDecodeError:
+                            transaction.extra_info = {'raw': extra_info}
+                    else:
+                        transaction.extra_info = extra_info
+                
                 transaction.save()
                 logger.error(f"DTB {transfer_type} Transfer initiation failed for transaction {transaction.transaction_id}: {response}")
                 return Response({
@@ -261,15 +283,22 @@ class BankTransferWebhookAPIView(APIView):
             if data.get('fee') is not None:
                 transaction.fee = data.get('fee')
             
+            # Update gateway fields directly
+            if data.get('gateway'):
+                transaction.gateway = data.get('gateway')
+            
+            if data.get('gatewayTransactionId'):
+                transaction.gateway_transaction_id = data.get('gatewayTransactionId')
+            
             # Store additional fields in extra_info
-            if not transaction.extra_info:
+            # Ensure extra_info is a dict, not a string
+            if not transaction.extra_info or not isinstance(transaction.extra_info, dict):
                 transaction.extra_info = {}
+            
             transaction.extra_info.update({
                 'paymentType': data.get('paymentType'),
                 'created': data.get('created'),
-                'errorDescription': data.get('errorDescription', ''),
-                'gateway': data.get('gateway'),
-                'gatewayTransactionId': data.get('gatewayTransactionId')
+                'errorDescription': data.get('errorDescription', '')
             })
             
             transaction.save()

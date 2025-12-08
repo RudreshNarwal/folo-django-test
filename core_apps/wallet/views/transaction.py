@@ -721,10 +721,12 @@ class CheckContactWalletAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        serializer = CheckContactWalletRequestSerializer(data=request.data)
+        # Pass request context for validation (needed for "own number" check)
+        serializer = CheckContactWalletRequestSerializer(data=request.data, context={'request': request})
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+        # phone_number is now in national format (712345678) - matches User.mobile
         phone_number = serializer.validated_data['phone_number']
         contact_name = serializer.validated_data.get('name')
         requesting_user = request.user
@@ -733,7 +735,7 @@ class CheckContactWalletAPIView(APIView):
         has_wallet = False
         wallet_id_response = "" # Default to empty string as requested
         try:
-            # Assuming User model has a unique 'mobile' field matching the phone_number format
+            # This will now match! Both are in national format (712345678)
             recipient_user = User.objects.get(mobile=phone_number)
             # Use filter().first() to avoid errors if duplicates somehow exist
             wallet = Wallet.objects.filter(user=recipient_user, status='ACTIVE').first()
@@ -750,8 +752,10 @@ class CheckContactWalletAPIView(APIView):
             wallet_id_response = ""
 
         # --- Get or Create/Update Contact for the Requesting User ---
-        # This happens regardless of whether the recipient has a wallet
-        contact = get_or_create_update_contact(requesting_user, phone_number, contact_name)
+        # Use ORIGINAL phone number from request for contact creation
+        # (get_or_create_update_contact will normalize it properly for PhoneNumberField storage)
+        original_phone = request.data.get('phone_number')
+        contact = get_or_create_update_contact(requesting_user, original_phone, contact_name)
 
         # --- Prepare and Return Response ---
         contact_serializer = UserContactSerializer(contact)

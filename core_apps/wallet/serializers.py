@@ -356,14 +356,39 @@ class CheckContactWalletRequestSerializer(serializers.Serializer):
 	name = serializers.CharField(max_length=100, required=False, allow_blank=True, allow_null=True)
 	
 	def validate_phone_number(self, value):
-		# Add more specific validation if needed (e.g., regex for Kenyan numbers)
-		if not value or not value.isdigit():
-			raise serializers.ValidationError("Invalid phone number format.")
-		# You might want to prevent checking the user's own number
-		request = self.context.get('request')
-		if request and request.user and value == request.user.mobile:
-			raise serializers.ValidationError("Cannot check your own phone number.")
-		return value
+		"""
+		Validate and normalize phone number to match User.mobile format.
+		Accepts various formats: +254712345678, 254712345678, 0712345678, etc.
+		Returns national number format (712345678) for DB lookup.
+		"""
+		from core_apps.users.utils import normalize_phone_number, get_phone_number_parts
+		from django.core.exceptions import ValidationError as DjangoValidationError
+		
+		try:
+			# Normalize to E164 format first (+254712345678)
+			normalized = normalize_phone_number(value)
+			
+			# Extract country code and national number
+			country_code, national_number = get_phone_number_parts(normalized)
+			
+			# Check if it's the user's own number
+			request = self.context.get('request')
+			if request and request.user:
+				# Compare using normalized format
+				user_full_number = f"{request.user.country_code}{request.user.mobile}"
+				try:
+					user_normalized = normalize_phone_number(user_full_number)
+					if normalized == user_normalized:
+						raise serializers.ValidationError("Cannot check your own phone number.")
+				except DjangoValidationError:
+					# If user's number fails normalization, skip the check
+					pass
+			
+			# Return national number for DB lookup (matches User.mobile format)
+			return national_number
+			
+		except DjangoValidationError as e:
+			raise serializers.ValidationError(f"Invalid phone number: {str(e)}")
 
 
 class UserContactSerializer(serializers.ModelSerializer):

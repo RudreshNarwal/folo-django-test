@@ -7,7 +7,7 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status, generics
-from django.db.models import Q, Sum, Count
+from django.db.models import Q, Sum, Count, Subquery, OuterRef
 from itertools import chain
 from operator import attrgetter
 from decimal import Decimal
@@ -696,8 +696,20 @@ class RecentContactsAPIView(generics.ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        # Order by last_used descending and take the top 10
-        return UserContact.objects.filter(user=user).order_by('-last_used')[:10]
+
+        # Subquery to get the most recent contact ID for each phone number
+        latest_contact_ids = UserContact.objects.filter(
+            user=user,
+            phone_number=OuterRef('phone_number')
+        ).order_by('-last_used').values('id')[:1]
+
+        # Get contacts using the subquery - ensures one contact per phone number
+        queryset = UserContact.objects.filter(
+            user=user,
+            id__in=Subquery(latest_contact_ids)
+        ).order_by('-last_used')[:10]
+
+        return queryset
 
 
 class CheckContactWalletAPIView(APIView):

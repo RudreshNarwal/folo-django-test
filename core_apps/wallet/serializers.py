@@ -161,14 +161,14 @@ class TransactionSerializer(serializers.ModelSerializer):
 				# Outgoing - show recipient info
 				return {
 					'wallet_id': str(obj.to_wallet.wallet_id),
-					'user_name': obj.to_wallet.user.get_full_name() if obj.to_wallet.user else None,
+					'user_name': obj.to_wallet.user.get_full_name if obj.to_wallet.user else None,
 					'phone': obj.to_wallet.user.mobile if obj.to_wallet.user else None
 				}
 			elif obj.to_wallet == user_wallet and obj.from_wallet:
 				# Incoming - show sender info
 				return {
 					'wallet_id': str(obj.from_wallet.wallet_id),
-					'user_name': obj.from_wallet.user.get_full_name() if obj.from_wallet.user else None,
+					'user_name': obj.from_wallet.user.get_full_name if obj.from_wallet.user else None,
 					'phone': obj.from_wallet.user.mobile if obj.from_wallet.user else None
 				}
 		

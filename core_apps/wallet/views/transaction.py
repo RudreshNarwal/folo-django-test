@@ -182,8 +182,8 @@ class WalletToWalletTransferAPIView(APIView):
         recipient_user = to_wallet.user
         contact = get_or_create_update_contact(
             user=request.user,
-            phone_number=recipient_user.mobile,
-            name=recipient_user.get_full_name()
+            phone_number=recipient_user.get_full_mobile,  # Use property (no parentheses) for full international format
+            name=recipient_user.get_full_name  # Use property (no parentheses)
         )
         
         # Create Transaction record initially as PENDING

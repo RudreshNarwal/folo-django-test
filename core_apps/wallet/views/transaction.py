@@ -423,7 +423,7 @@ class WalletToMpesaTransferAPIView(TransactionEventManagerMixin, APIView):
                     "fee": float(transaction.fee),
                     "status": transaction.status,
                     "contact_name": contact.name,
-                    "contact_phone": contact.phone_number,
+                    "contact_phone": str(contact.phone_number),
                 }, status=status.HTTP_200_OK)
             else:
                 # Handle failed transaction initiation
@@ -1222,7 +1222,9 @@ class TransactionStatusAPIView(TransactionEventManagerMixin, APIView):
                 "gateway": transaction_obj.gateway,
                 "contact_info": {
                     "name": transaction_obj.contact.name if transaction_obj.contact else None,
-                    "phone": transaction_obj.contact.phone_number if transaction_obj.contact else None
+                    "phone": str(transaction_obj.contact.phone_number) if transaction_obj.contact else None,
+                    "country_code": transaction_obj.contact.country_code_cached if transaction_obj.contact else None,
+                    "country": transaction_obj.contact.country_cached if transaction_obj.contact else None
                 } if transaction_obj.contact else None,
                 "bank_beneficiary_info": {
                     "account_holder_name": transaction_obj.bank_beneficiary.account_holder_name,

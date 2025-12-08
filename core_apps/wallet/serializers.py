@@ -80,7 +80,7 @@ class TransactionSerializer(serializers.ModelSerializer):
 	from_wallet_id = serializers.CharField(source='from_wallet.wallet_id', read_only=True, allow_null=True)
 	to_wallet_id = serializers.CharField(source='to_wallet.wallet_id', read_only=True, allow_null=True)
 	contact_name = serializers.CharField(source='contact.name', read_only=True, allow_null=True)
-	contact_phone = serializers.CharField(source='contact.phone_number', read_only=True, allow_null=True)
+	contact_phone = serializers.SerializerMethodField()  # Use method to ensure proper string serialization
 	bank_beneficiary_info = serializers.SerializerMethodField()
 	transaction_direction = serializers.SerializerMethodField()
 	other_party_info = serializers.SerializerMethodField()
@@ -107,6 +107,12 @@ class TransactionSerializer(serializers.ModelSerializer):
 				'branch_name': obj.bank_beneficiary.branch_name,
 				'nickname': obj.bank_beneficiary.nickname
 			}
+		return None
+	
+	def get_contact_phone(self, obj):
+		"""Get contact phone number as string for JSON serialization."""
+		if obj.contact and obj.contact.phone_number:
+			return str(obj.contact.phone_number)
 		return None
 	
 	def get_transaction_direction(self, obj):
@@ -393,6 +399,7 @@ class CheckContactWalletRequestSerializer(serializers.Serializer):
 
 class UserContactSerializer(serializers.ModelSerializer):
 	"""Enhanced contact serializer with computed display fields."""
+	phone_number = serializers.CharField(read_only=True)  # Ensure PhoneNumberField is serialized as string
 	country_code = serializers.CharField(read_only=True)  # Property from model
 	country = serializers.CharField(source='country_cached', read_only=True)  # Cached field
 	display_number = serializers.CharField(read_only=True)  # Property from model

@@ -218,7 +218,21 @@ class UserContact(models.Model):
 		max_length=20,
 		help_text="Phone number in E164 format (+254XXXXXXXXX)"
 	)
-	
+
+	# Cached country fields for performance (hybrid approach)
+	country_code_cached = models.CharField(
+		max_length=5,
+		blank=True,
+		null=True,
+		help_text="Cached country code (e.g., +254) for performance"
+	)
+	country_cached = models.CharField(
+		max_length=2,
+		blank=True,
+		null=True,
+		help_text="Cached country ISO code (e.g., KE) for performance"
+	)
+
 	# Track how contact was added
 	source = models.CharField(
 		max_length=20,
@@ -242,6 +256,14 @@ class UserContact(models.Model):
 			models.Index(fields=['user', 'source']),
 			models.Index(fields=['user', '-last_used']),
 		]
+
+	def save(self, *args, **kwargs):
+		# Auto-populate cached country fields from phone number
+		if self.phone_number:
+			from core_apps.users.utils import get_country_from_country_code
+			self.country_code_cached = self.country_code  # Use computed property
+			self.country_cached = get_country_from_country_code(self.country_code_cached)
+		super().save(*args, **kwargs)
 
 	def __str__(self):
 		return f"{self.user.get_username()}'s contact: {self.name or self.phone_number}"

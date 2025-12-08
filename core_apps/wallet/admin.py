@@ -95,8 +95,8 @@ class WalletMovementCallbackAdmin(admin.ModelAdmin):
 
 @admin.register(UserContact)
 class UserContactAdmin(admin.ModelAdmin):
-    list_display = ['user', 'name', 'phone_number', 'last_used']
-    list_filter = ['last_used', 'created_at']
+    list_display = ['user', 'name', 'phone_number', 'country_code_cached', 'country_cached', 'last_used']
+    list_filter = ['last_used', 'created_at', 'country_cached', 'source']
     search_fields = ['user__mobile', 'name', 'phone_number']
     raw_id_fields = ['user']
 

@@ -394,19 +394,20 @@ class CheckContactWalletRequestSerializer(serializers.Serializer):
 class UserContactSerializer(serializers.ModelSerializer):
 	"""Enhanced contact serializer with computed display fields."""
 	country_code = serializers.CharField(read_only=True)  # Property from model
+	country = serializers.CharField(source='country_cached', read_only=True)  # Cached field
 	display_number = serializers.CharField(read_only=True)  # Property from model
 	international_display = serializers.CharField(read_only=True)  # Property from model
 	source = serializers.CharField(read_only=True)
-	
+
 	class Meta:
 		model = UserContact
 		fields = [
-			'id', 'name', 'phone_number', 'country_code', 
+			'id', 'name', 'phone_number', 'country_code', 'country',
 			'display_number', 'international_display',
 			'source', 'last_used', 'created_at'
 		]
 		read_only_fields = [
-			'id', 'last_used', 'created_at', 'country_code', 
+			'id', 'last_used', 'created_at', 'country_code', 'country',
 			'display_number', 'international_display', 'source'
 		]
 

@@ -3,6 +3,9 @@ from django.conf import settings
 from uuid import uuid4
 import base64
 import logging
+import phonenumbers
+from phonenumbers import NumberParseException
+from django.core.exceptions import ValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -207,3 +210,78 @@ def get_country_from_country_code(country_code):
         str: The country code for django-countries field (e.g., 'KE')
     """
     return COUNTRY_CODE_TO_COUNTRY_MAPPING.get(country_code, 'KE')  # Default to Kenya
+
+
+def normalize_phone_number(phone_number, default_country='KE'):
+    """
+    Normalize a phone number to E164 format.
+    
+    Args:
+        phone_number (str): Phone number to normalize
+        default_country (str): Default country code if not in number
+        
+    Returns:
+        str: Normalized phone number in E164 format (+254XXXXXXXXX)
+        
+    Raises:
+        ValidationError: If phone number is invalid
+    """
+    try:
+        # Remove any whitespace and common separators
+        cleaned = str(phone_number).strip().replace(' ', '').replace('-', '').replace('(', '').replace(')', '')
+        
+        # Try parsing with default country first
+        try:
+            parsed = phonenumbers.parse(cleaned, default_country)
+        except NumberParseException:
+            # If that fails, try without country hint
+            parsed = phonenumbers.parse(cleaned, None)
+        
+        # Validate the number
+        if not phonenumbers.is_valid_number(parsed):
+            raise ValidationError(f"Invalid phone number: {phone_number}")
+        
+        # Return E164 format
+        return phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
+        
+    except NumberParseException as e:
+        raise ValidationError(f"Could not parse phone number '{phone_number}': {str(e)}")
+    except Exception as e:
+        raise ValidationError(f"Error normalizing phone number: {str(e)}")
+
+
+def get_phone_number_parts(phone_number, default_country='KE'):
+    """
+    Extract country code and national number from a phone number.
+    
+    Args:
+        phone_number (str): Phone number to parse
+        default_country (str): Default country code if not in number
+        
+    Returns:
+        tuple: (country_code, national_number)
+        Example: ('+254', '712345678')
+        
+    Raises:
+        ValidationError: If phone number is invalid
+    """
+    try:
+        cleaned = str(phone_number).strip().replace(' ', '').replace('-', '').replace('(', '').replace(')', '')
+        
+        try:
+            parsed = phonenumbers.parse(cleaned, default_country)
+        except NumberParseException:
+            parsed = phonenumbers.parse(cleaned, None)
+        
+        if not phonenumbers.is_valid_number(parsed):
+            raise ValidationError(f"Invalid phone number: {phone_number}")
+        
+        country_code = f"+{parsed.country_code}"
+        national_number = str(parsed.national_number)
+        
+        return (country_code, national_number)
+        
+    except NumberParseException as e:
+        raise ValidationError(f"Could not parse phone number '{phone_number}': {str(e)}")
+    except Exception as e:
+        raise ValidationError(f"Error parsing phone number: {str(e)}")

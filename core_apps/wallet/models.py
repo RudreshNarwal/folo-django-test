@@ -207,19 +207,74 @@ class TopUpTransaction(models.Model):
 
 class UserContact(models.Model):
 	"""Stores contacts associated with a user for quick transfers."""
+	from phonenumber_field.modelfields import PhoneNumberField
+	
 	user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='contacts')
-	name = models.CharField(max_length=100, blank=True, null=True) # Name is optional
-	phone_number = models.CharField(max_length=20) # Consider adding validation
+	name = models.CharField(max_length=100, blank=True, null=True, help_text="Contact name")
+	
+	# Store ONLY the normalized phone number in E164 format
+	phone_number = PhoneNumberField(
+		region='KE',
+		max_length=20,
+		help_text="Phone number in E164 format (+254XXXXXXXXX)"
+	)
+	
+	# Track how contact was added
+	source = models.CharField(
+		max_length=20,
+		default='manual',
+		choices=[
+			('manual', 'Manually Added'),
+			('mobile_import', 'Mobile Contacts Import'),
+			('transaction', 'From Transaction'),
+		],
+		help_text="How this contact was added"
+	)
+	
 	last_used = models.DateTimeField(default=timezone.now)
 	created_at = models.DateTimeField(auto_now_add=True)
 	updated_at = models.DateTimeField(auto_now=True)
 
 	class Meta:
-		unique_together = ('user', 'phone_number') # A user can only have one contact per phone number
+		unique_together = ('user', 'phone_number')
 		ordering = ['-last_used', 'name']
+		indexes = [
+			models.Index(fields=['user', 'source']),
+			models.Index(fields=['user', '-last_used']),
+		]
 
 	def __str__(self):
 		return f"{self.user.get_username()}'s contact: {self.name or self.phone_number}"
+	
+	@property
+	def country_code(self):
+		"""Extract country code from phone number."""
+		try:
+			import phonenumbers
+			parsed = phonenumbers.parse(str(self.phone_number), None)
+			return f"+{parsed.country_code}"
+		except:
+			return '+254'  # Fallback to Kenya
+	
+	@property
+	def display_number(self):
+		"""Get national format for display (without country code)."""
+		try:
+			import phonenumbers
+			parsed = phonenumbers.parse(str(self.phone_number), None)
+			return phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.NATIONAL)
+		except:
+			return str(self.phone_number)
+	
+	@property
+	def international_display(self):
+		"""Get international format for display."""
+		try:
+			import phonenumbers
+			parsed = phonenumbers.parse(str(self.phone_number), None)
+			return phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.INTERNATIONAL)
+		except:
+			return str(self.phone_number)
 
 
 class BankBeneficiary(models.Model):

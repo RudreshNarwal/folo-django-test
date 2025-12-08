@@ -75,18 +75,69 @@ class TransactionEventManagerMixin:
 
 
 # Helper function to get or create/update contact
-def get_or_create_update_contact(user, phone_number, name=None):
-    contact, created = UserContact.objects.get_or_create(
+def get_or_create_update_contact(user, phone_number, name=None, source='transaction'):
+    """
+    Get or create/update a contact for a user.
+    
+    Args:
+        user: User object
+        phone_number: Phone number (any format - will be normalized)
+        name: Optional contact name
+        source: How the contact was added ('manual', 'mobile_import', 'transaction')
+        
+    Returns:
+        UserContact instance
+        
+    Raises:
+        ValidationError: If phone number is invalid
+    """
+    from core_apps.users.utils import normalize_phone_number
+    from django.core.exceptions import ValidationError
+    
+    try:
+        # Normalize the phone number
+        normalized_phone = normalize_phone_number(phone_number)
+    except ValidationError as e:
+        # If normalization fails, raise the error - don't store invalid numbers
+        logger.error(f"Invalid phone number '{phone_number}': {str(e)}")
+        raise ValidationError(f"Invalid phone number: {str(e)}")
+    
+    # Try to find existing contact by normalized phone number
+    contact = UserContact.objects.filter(
         user=user,
-        phone_number=phone_number,
-        defaults={'name': name, 'last_used': timezone.now()}
-    )
-    if not created:
-        # Update name if provided and different, always update last_used
-        if name and contact.name != name:
+        phone_number=normalized_phone
+    ).first()
+    
+    if contact:
+        # Update existing contact
+        updated = False
+        
+        if name and (not contact.name or contact.name != name):
             contact.name = name
+            updated = True
+        
+        # Update source if it's a "better" source
+        source_priority = {'mobile_import': 3, 'transaction': 2, 'manual': 1}
+        if source_priority.get(source, 0) > source_priority.get(contact.source, 0):
+            contact.source = source
+            updated = True
+        
+        if updated:
+            contact.save()
+        
+        # Always update last_used
         contact.last_used = timezone.now()
-        contact.save(update_fields=['name', 'last_used'] if name else ['last_used'])
+        contact.save(update_fields=['last_used'])
+    else:
+        # Create new contact
+        contact = UserContact.objects.create(
+            user=user,
+            phone_number=normalized_phone,
+            name=name,
+            source=source,
+            last_used=timezone.now()
+        )
+    
     return contact
 
 

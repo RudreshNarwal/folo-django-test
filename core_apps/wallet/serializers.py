@@ -367,10 +367,69 @@ class CheckContactWalletRequestSerializer(serializers.Serializer):
 
 
 class UserContactSerializer(serializers.ModelSerializer):
+	"""Enhanced contact serializer with computed display fields."""
+	country_code = serializers.CharField(read_only=True)  # Property from model
+	display_number = serializers.CharField(read_only=True)  # Property from model
+	international_display = serializers.CharField(read_only=True)  # Property from model
+	source = serializers.CharField(read_only=True)
+	
 	class Meta:
 		model = UserContact
-		fields = ['id', 'name', 'phone_number', 'last_used']
-		read_only_fields = ['id', 'last_used']
+		fields = [
+			'id', 'name', 'phone_number', 'country_code', 
+			'display_number', 'international_display',
+			'source', 'last_used', 'created_at'
+		]
+		read_only_fields = [
+			'id', 'last_used', 'created_at', 'country_code', 
+			'display_number', 'international_display', 'source'
+		]
+
+
+class MobileContactImportSerializer(serializers.Serializer):
+	"""Serializer for importing contacts from mobile devices."""
+	contacts = serializers.ListField(
+		child=serializers.DictField(),
+		required=True,
+		help_text="List of contacts from mobile device"
+	)
+	
+	def validate_contacts(self, value):
+		if not isinstance(value, list):
+			raise serializers.ValidationError("Contacts must be a list")
+		
+		if len(value) > 500:
+			raise serializers.ValidationError("Cannot import more than 500 contacts at once")
+		
+		from core_apps.users.utils import normalize_phone_number
+		from django.core.exceptions import ValidationError as DjangoValidationError
+		
+		validated_contacts = []
+		for i, contact in enumerate(value):
+			if not isinstance(contact, dict):
+				continue
+			
+			name = contact.get('name', '').strip()
+			phone = contact.get('phone', '').strip()
+			
+			if not phone:
+				continue  # Skip contacts without phone numbers
+			
+			try:
+				normalized = normalize_phone_number(phone)
+				validated_contacts.append({
+					'name': name[:100] if name else None,
+					'phone_number': normalized,
+					'original_phone': phone,
+				})
+			except DjangoValidationError:
+				# Skip invalid phone numbers
+				continue
+		
+		if not validated_contacts:
+			raise serializers.ValidationError("No valid contacts found")
+		
+		return validated_contacts
 
 
 class BankBeneficiarySerializer(serializers.ModelSerializer):

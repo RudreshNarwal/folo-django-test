@@ -178,6 +178,14 @@ class WalletToWalletTransferAPIView(APIView):
         # Generate unique ID for the transaction
         external_unique_id = uuid.uuid4()
         
+        # Get or create contact for the recipient
+        recipient_user = to_wallet.user
+        contact = get_or_create_update_contact(
+            user=request.user,
+            phone_number=recipient_user.mobile,
+            name=recipient_user.get_full_name()
+        )
+        
         # Create Transaction record initially as PENDING
         transaction = Transaction.objects.create(
             external_unique_id=external_unique_id,
@@ -189,7 +197,8 @@ class WalletToWalletTransferAPIView(APIView):
             status='PENDING',
             user=request.user,
             customer=from_wallet.customer,
-            description=description
+            description=description,
+            contact=contact  # Link to contact
         )
         
         # Schedule timeout check for this transaction (5 minutes)
@@ -636,7 +645,7 @@ class TransactionHistoryAPIView(generics.ListAPIView):
             Q(transaction_type='ADJUSTMENT') & 
             Q(external_reference_id__startswith='DB-') | 
             Q(external_reference_id__startswith='CR-')
-        ).distinct().order_by('-created_at')
+        ).select_related('contact', 'bank_beneficiary').distinct().order_by('-created_at')
         
         return queryset
 
@@ -758,7 +767,7 @@ class ContactTransactionHistoryAPIView(generics.ListAPIView):
             return Transaction.objects.none()
 
         # Filter transactions linked to this user and this contact
-        return Transaction.objects.filter(user=user, contact=contact).order_by('-created_at')
+        return Transaction.objects.filter(user=user, contact=contact).select_related('contact', 'bank_beneficiary').order_by('-created_at')
 
 
 class ComprehensiveWalletHistoryAPIView(generics.ListAPIView):
@@ -789,7 +798,7 @@ class ComprehensiveWalletHistoryAPIView(generics.ListAPIView):
             Q(transaction_type='ADJUSTMENT') & 
             Q(external_reference_id__startswith='DB-') | 
             Q(external_reference_id__startswith='CR-')
-        ).distinct().order_by('-created_at')
+        ).select_related('contact', 'bank_beneficiary').distinct().order_by('-created_at')
         
         return queryset
 

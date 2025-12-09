@@ -58,6 +58,18 @@ EFT_KEY_ORDER = [
     'currency'
 ]
 
+IFT_KEY_ORDER = [
+    'accountName',
+    'accountNumber',
+    'branchCode',
+    'amount',
+    'callbackUrl',
+    'accountCurrency',
+    'description',
+    'type',
+    'externalUniqueId'
+]
+
 
 def order_payload(payload_dict, key_order):
     """
@@ -205,6 +217,36 @@ def create_eft_payload(account_name, account_number, branch_code, bank_code,
     }, EFT_KEY_ORDER)
 
 
+def create_ift_payload(account_name, account_number, branch_code,
+                      amount, callback_url, description, external_unique_id):
+    """
+    Create IFT transfer payload with canonical key order.
+
+    Args:
+        account_name: Account holder name
+        account_number: Beneficiary account number
+        branch_code: Bank branch code
+        amount: Amount to transfer
+        callback_url: Webhook URL for status updates
+        description: Transfer description
+        external_unique_id: Unique transaction ID
+
+    Returns:
+        OrderedDict with keys in canonical order
+    """
+    return order_payload({
+        'accountName': account_name,
+        'accountNumber': account_number,
+        'branchCode': branch_code,
+        'amount': float(amount),
+        'callbackUrl': callback_url,
+        'accountCurrency': 'KES',
+        'description': description,
+        'type': 'KE_DTB_IFT',
+        'externalUniqueId': str(external_unique_id)
+    }, IFT_KEY_ORDER)
+
+
 def restore_payload_order(payload_dict, transfer_type):
     """
     Restore canonical key order for payload retrieved from database.
@@ -228,6 +270,8 @@ def restore_payload_order(payload_dict, transfer_type):
         return order_payload(payload_dict, PESALINK_KEY_ORDER)
     elif transfer_type in ['WALLET_TO_BANK', 'WALLET_TO_EFT']:
         return order_payload(payload_dict, EFT_KEY_ORDER)
+    elif transfer_type == 'WALLET_TO_IFT':
+        return order_payload(payload_dict, IFT_KEY_ORDER)
     else:
         # Fallback: return as-is (shouldn't happen)
         return payload_dict

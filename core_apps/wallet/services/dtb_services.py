@@ -477,7 +477,7 @@ class DTBService:
     def wallet_to_eft_transfer(self, wallet_id, payload):
         """
         Transfer funds from wallet to bank account via EFT
-        
+
         Payload should include:
         - accountName: Account holder name
         - accountNumber: Bank account number
@@ -496,7 +496,26 @@ class DTBService:
         url = f'{self.BASE_URL}/tenants/{self.TENANT_ID}/wallets/{wallet_id}/withdrawals'
         response = self.request_with_retries('POST', url, json=payload, headers=self.headers)
         return response.json()
-        
+
+    def wallet_to_ift_transfer(self, wallet_id, payload):
+        """
+        Transfer funds from wallet to DTB bank account via IFT
+
+        Payload should include:
+        - accountName: Account holder name
+        - accountNumber: Bank account number
+        - branchCode: Branch code
+        - amount: Amount to transfer
+        - callbackUrl: URL for callback notifications
+        - accountCurrency: Account currency (e.g., "KES")
+        - description: Description of the transaction
+        - type: "KE_DTB_IFT"
+        - externalUniqueId: Unique ID for the transaction
+        """
+        url = f'{self.BASE_URL}/tenants/{self.TENANT_ID}/wallets/{wallet_id}/withdrawals'
+        response = self.request_with_retries('POST', url, json=payload, headers=self.headers)
+        return response.json()
+
     def get_bank_transfer_fee(self, wallet_id, amount, transfer_type="KE_DTB_PESALINK"):
         """
         Get the fee for a specific bank transfer amount and type

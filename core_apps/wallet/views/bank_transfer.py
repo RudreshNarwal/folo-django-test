@@ -21,7 +21,7 @@ from ..services.dtb_services import (
     DTBServiceAPIError,
     DTBServiceSCAChallengeError,
 )
-from ..utils.payload_ordering import create_pesalink_payload, create_eft_payload
+from ..utils.payload_ordering import create_pesalink_payload, create_eft_payload, create_ift_payload
 from ..tasks import schedule_transaction_timeout_check
 
 logger = logging.getLogger(__name__)
@@ -61,7 +61,12 @@ class WalletToBankTransferAPIView(APIView):
         external_unique_id = uuid.uuid4()
         
         # Determine transaction type for database
-        transaction_type = 'WALLET_TO_PESALINK' if transfer_type == 'PESALINK' else 'WALLET_TO_BANK'
+        if beneficiary.bank_code == "0052":
+            transaction_type = 'WALLET_TO_IFT'
+        elif transfer_type == 'PESALINK':
+            transaction_type = 'WALLET_TO_PESALINK'
+        else:
+            transaction_type = 'WALLET_TO_BANK'
 
         # Create Transaction record initially as PENDING
         transaction = Transaction.objects.create(
@@ -83,8 +88,20 @@ class WalletToBankTransferAPIView(APIView):
         dtb_service = DTBService()
 
         callback_url = settings.BANK_TRANSFER_CALLBACK_URL
+
+        # Check if this is a DTB bank transfer (bank code "0052") - use IFT
+        if beneficiary.bank_code == "0052":
+            payload = create_ift_payload(
+                account_name=beneficiary.account_holder_name,
+                account_number=beneficiary.account_number,
+                branch_code=beneficiary.branch_code,
+                amount=amount,
+                callback_url=callback_url,
+                description=description,
+                external_unique_id=external_unique_id
+            )
         # Prepare payload using canonical key ordering
-        if transfer_type == 'PESALINK':
+        elif transfer_type == 'PESALINK':
             payload = create_pesalink_payload(
                 amount=amount,
                 description=description,
@@ -109,7 +126,9 @@ class WalletToBankTransferAPIView(APIView):
             )
 
         try:
-            if transfer_type == 'PESALINK':
+            if beneficiary.bank_code == "0052":
+                response = dtb_service.wallet_to_ift_transfer(from_wallet.wallet_id, payload)
+            elif transfer_type == 'PESALINK':
                 response = dtb_service.wallet_to_pesalink_transfer(from_wallet.wallet_id, payload)
             else:
                 response = dtb_service.wallet_to_eft_transfer(from_wallet.wallet_id, payload)
@@ -153,9 +172,12 @@ class WalletToBankTransferAPIView(APIView):
                 from_wallet.current_balance = wallet_details['currentBalance']
                 from_wallet.save()
 
-                status_message = f"{transfer_type} transfer initiated successfully"
+                # Determine transfer type for messaging
+                display_transfer_type = "IFT" if beneficiary.bank_code == "0052" else transfer_type
+
+                status_message = f"{display_transfer_type} transfer initiated successfully"
                 if response.get('status') == 'PENDING':
-                    status_message = f"{transfer_type} transfer is being processed"
+                    status_message = f"{display_transfer_type} transfer is being processed"
 
                 return Response({
                     "message": status_message,

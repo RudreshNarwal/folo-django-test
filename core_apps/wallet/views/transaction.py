@@ -774,17 +774,54 @@ class ContactTransactionHistoryAPIView(generics.ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        contact_id = self.kwargs.get('contact_id') # Get contact_id from URL path
+        contact_id = self.kwargs.get('contact_id')
 
-        # Fetch the specific contact for the user
+        # 1. Fetch the specific contact for the user
         try:
             contact = UserContact.objects.get(user=user, id=contact_id)
         except UserContact.DoesNotExist:
-            # Return empty queryset if contact doesn't exist or doesn't belong to user
             return Transaction.objects.none()
 
-        # Filter transactions linked to this user and this contact
-        return Transaction.objects.filter(user=user, contact=contact).select_related('contact', 'bank_beneficiary').order_by('-created_at')
+        # 2. Get user's active wallet (to identify incoming transactions)
+        try:
+            user_wallet = Wallet.objects.get(user=user, status='ACTIVE')
+        except Wallet.DoesNotExist:
+            # If user has no wallet, they can only have outgoing transactions (theoretically)
+            # stored on the transaction object itself if they used to have one.
+            # But practically, let's just return outgoing for now or empty if strictly required.
+            return Transaction.objects.filter(user=user, contact=contact).order_by('-created_at')
+        except Wallet.MultipleObjectsReturned:
+             user_wallet = Wallet.objects.filter(user=user, status='ACTIVE').first()
+
+        # 3. Parse Contact's phone number for matching
+        # Data format in DB: PhoneNumberField (e.g., +254712345678)
+        # We need to match against User.mobile (e.g., 712345678) and User.country_code (+254)
+        
+        try:
+            from core_apps.users.utils import get_phone_number_parts
+            # Ensure we have a string to parse
+            phone_str = str(contact.phone_number)
+            country_code, national_number = get_phone_number_parts(phone_str)
+        except Exception as e:
+            # Fallback if parsing fails: just return outgoing
+            logger.error(f"Error parsing contact phone {contact.phone_number}: {e}")
+            return Transaction.objects.filter(user=user, contact=contact).order_by('-created_at')
+
+        # 4. Construct Query
+        # A. Outgoing: User initiated it and linked to this contact (standard flow)
+        q_outgoing = Q(user=user, contact=contact)
+        
+        # B. Incoming: Money received into user's wallet FROM the person with this phone number
+        # We match the sender's wallet user by mobile and country code
+        q_incoming = Q(
+            to_wallet=user_wallet,
+            from_wallet__user__mobile=national_number, 
+            from_wallet__user__country_code=country_code
+        )
+
+        return Transaction.objects.filter(
+            q_outgoing | q_incoming
+        ).select_related('contact', 'bank_beneficiary', 'from_wallet__user', 'to_wallet__user').distinct().order_by('-created_at')
 
 
 class ComprehensiveWalletHistoryAPIView(generics.ListAPIView):

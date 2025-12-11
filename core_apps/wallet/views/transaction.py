@@ -770,6 +770,7 @@ class ContactTransactionHistoryAPIView(generics.ListAPIView):
     """API view for listing transaction history with a specific contact."""
     permission_classes = [IsAuthenticated]
     serializer_class = TransactionSerializer
+    pagination_class = TransactionHistoryPagination
 
     def get_queryset(self):
         user = self.request.user

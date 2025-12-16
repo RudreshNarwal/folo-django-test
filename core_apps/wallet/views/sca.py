@@ -236,7 +236,7 @@ class SCAUpgradeJWTAPIView(APIView):
                         "transaction_id": str(transaction.transaction_id)
                     }, status=status.HTTP_400_BAD_REQUEST)
 
-            elif sca_session.transfer_type in ['WALLET_TO_PESALINK', 'WALLET_TO_BANK']:
+            elif sca_session.transfer_type in ['WALLET_TO_PESALINK', 'WALLET_TO_BANK', 'WALLET_TO_IFT']:
                 # Extract walletId FIRST (it's metadata, not part of the DTB payload)
                 wallet_id = payload.get('walletId')
                 bank_payload = {k: v for k, v in payload.items() if k != 'walletId'}
@@ -249,6 +249,9 @@ class SCAUpgradeJWTAPIView(APIView):
                 # Determine the correct endpoint based on transfer type
                 if sca_session.transfer_type == 'WALLET_TO_PESALINK':
                     # Construct the exact URL for PesaLink transfer
+                    original_url = f'{dtb_service.BASE_URL}/tenants/{dtb_service.TENANT_ID}/wallets/{wallet_id}/withdrawals'
+                elif sca_session.transfer_type == 'WALLET_TO_IFT':
+                    # Construct the exact URL for IFT transfer
                     original_url = f'{dtb_service.BASE_URL}/tenants/{dtb_service.TENANT_ID}/wallets/{wallet_id}/withdrawals'
                 else:  # WALLET_TO_BANK (EFT)
                     # Construct the exact URL for EFT transfer
@@ -280,7 +283,12 @@ class SCAUpgradeJWTAPIView(APIView):
                         sca_session.status = 'COMPLETED'
                         sca_session.save()
 
-                        transfer_type_display = "PesaLink" if sca_session.transfer_type == 'WALLET_TO_PESALINK' else "EFT"
+                        if sca_session.transfer_type == 'WALLET_TO_PESALINK':
+                            transfer_type_display = "PesaLink"
+                        elif sca_session.transfer_type == 'WALLET_TO_IFT':
+                            transfer_type_display = "IFT"
+                        else:
+                            transfer_type_display = "EFT"
                         return Response({
                             "message": f"{transfer_type_display} transfer initiated successfully",
                             "transaction_id": str(transaction.transaction_id),

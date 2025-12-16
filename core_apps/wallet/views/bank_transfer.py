@@ -186,7 +186,7 @@ class WalletToBankTransferAPIView(APIView):
                     "amount": float(amount),
                     "fee": float(transaction.fee),
                     "status": transaction.status,
-                    "transfer_type": transfer_type,
+                    "transfer_type": display_transfer_type,
                     "beneficiary": {
                         "account_holder_name": beneficiary.account_holder_name,
                         "account_number": beneficiary.account_number,
@@ -211,9 +211,9 @@ class WalletToBankTransferAPIView(APIView):
                         transaction.extra_info = extra_info
                 
                 transaction.save()
-                logger.error(f"DTB {transfer_type} Transfer initiation failed for transaction {transaction.transaction_id}: {response}")
+                logger.error(f"DTB {display_transfer_type} Transfer initiation failed for transaction {transaction.transaction_id}: {response}")
                 return Response({
-                    "error": f"{transfer_type} transfer initiation failed",
+                    "error": f"{display_transfer_type} transfer initiation failed",
                     "transaction_id": str(transaction.transaction_id),
                     "status": response.get('status'),
                     "details": response.get('extraInfo', response)
@@ -252,7 +252,7 @@ class WalletToBankTransferAPIView(APIView):
             transaction.status = 'FAILED'
             transaction.save()
             error_message = str(e)
-            logger.error(f"DTB API Error during {transfer_type} transfer for transaction {transaction.transaction_id}: {e}")
+            logger.error(f"DTB API Error during {display_transfer_type} transfer for transaction {transaction.transaction_id}: {e}")
             return Response({
                 "error": error_message,
                 "transaction_id": str(transaction.transaction_id)
@@ -261,7 +261,7 @@ class WalletToBankTransferAPIView(APIView):
             # Handle unexpected errors
             transaction.status = 'FAILED'
             transaction.save()
-            logger.error(f"Unexpected error during {transfer_type} transfer for transaction {transaction.transaction_id}: {e}")
+            logger.error(f"Unexpected error during {display_transfer_type} transfer for transaction {transaction.transaction_id}: {e}")
             return Response({
                 "error": "An unexpected error occurred",
                 "transaction_id": str(transaction.transaction_id)

@@ -271,7 +271,7 @@ class WalletToBankTransferAPIView(APIView):
 class BankTransferWebhookAPIView(APIView):
     """
     Webhook endpoint for bank transfer status updates.
-    This handles callbacks for both PesaLink and EFT transfers.
+    This handles callbacks for PesaLink, EFT, and IFT transfers.
     """
     permission_classes = []  # Allow unauthenticated access for webhook callbacks
     def post(self, request):
@@ -285,7 +285,7 @@ class BankTransferWebhookAPIView(APIView):
             # Find the transaction by external_unique_id
             transaction = Transaction.objects.get(
                 external_unique_id=uuid.UUID(external_unique_id),
-                transaction_type__in=['WALLET_TO_BANK', 'WALLET_TO_PESALINK']
+                transaction_type__in=['WALLET_TO_BANK', 'WALLET_TO_PESALINK', 'WALLET_TO_IFT']
             )
             
             # Store the complete webhook response data

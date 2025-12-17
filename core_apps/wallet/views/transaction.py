@@ -1196,7 +1196,7 @@ class TransactionStatusAPIView(TransactionEventManagerMixin, APIView):
                         
                         transaction_obj.save()
                 
-                elif transaction_obj.transaction_type in ['WALLET_TO_BANK', 'WALLET_TO_PESALINK']:
+                elif transaction_obj.transaction_type in ['WALLET_TO_BANK', 'WALLET_TO_PESALINK', 'WALLET_TO_IFT']:
                     # For bank transfers, update wallet balance
                     wallet_details = dtb_service.get_wallet_details(transaction_obj.from_wallet.wallet_id)
                     wallet = transaction_obj.from_wallet

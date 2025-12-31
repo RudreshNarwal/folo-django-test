@@ -59,6 +59,8 @@ urlpatterns = [
     path('api/v1/active-subscriptions/', ActiveSubscriptionAPIView.as_view(), name='active-subscriptions'),
     path('api/v1/payment-plans/', PlanAPIView.as_view(), name='payment-plans'),
 
+    # Admin Dashboard
+    path('dashboard/', include('core_apps.dashboard.urls')),
 ]
 
 admin.site.site_header = "FoloMoney API Admin"

@@ -53,6 +53,7 @@ LOCAL_APPS = [
 	"core_apps.payments",
 	"core_apps.wallet",
 	"core_apps.international_wallet",
+	"core_apps.dashboard",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS

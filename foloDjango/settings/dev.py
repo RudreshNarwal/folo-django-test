@@ -16,7 +16,7 @@ env_file = ROOT_DIR / '.envs/.dev/.django'
 if env_file.is_file():
 	environ.Env.read_env(str(env_file))
 
-DEBUG = env.bool('DJANGO_DEBUG', False)
+DEBUG = True  # Set to True for local development to see detailed errors
 
 ROOT_URLCONF = "foloDjango.urls"
 

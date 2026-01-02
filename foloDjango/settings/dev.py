@@ -240,8 +240,8 @@ ADMIN_URL = env("DJANGO_ADMIN_URL")
 DATABASES = {"default": env.db("DATABASE_URL")}
 # SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")  # comment this to run in local
 # SECURE_SSL_REDIRECT = env.bool("DJANGO_SECURE_SSL_REDIRECT", default=True)  # comment this to run in local
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SECURE = False  # Set to False for local HTTP development
+CSRF_COOKIE_SECURE = False  # Set to False for local HTTP development
 
 # TODO: change to 518400 later
 SECURE_HSTS_SECONDS = 60

@@ -230,7 +230,12 @@ LOGGING = {
 ADMINS = [("Rudresh Narwal", "rudresh@ubuntuonline.co.ke")]
 
 # TODO add domain names of the production server
-CSRF_TRUSTED_ORIGINS = ["https://folo.money", "http://localhost:8000", "http://127.0.0.1:8000"]
+CSRF_TRUSTED_ORIGINS = [
+    "https://folo.money",
+    "https://dev-api.folo.money",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+]
 SECRET_KEY = env("DJANGO_SECRET_KEY")
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["folo.money"]) + ["localhost", "0.0.0.0",
                                                                             "127.0.0.1", "api.astraafrica.co", "api.africastalking.com"]  # for local ALLOWED_HOSTS = ["localhost", "0.0.0.0", "127.0.0.1"]
@@ -240,10 +245,10 @@ ADMIN_URL = env("DJANGO_ADMIN_URL")
 DATABASES = {"default": env.db("DATABASE_URL")}
 # SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")  # comment this to run in local
 # SECURE_SSL_REDIRECT = env.bool("DJANGO_SECURE_SSL_REDIRECT", default=True)  # comment this to run in local
-SESSION_COOKIE_SECURE = False  # Set to False for local HTTP development
-CSRF_COOKIE_SECURE = False  # Set to False for local HTTP development
-CSRF_COOKIE_SAMESITE = 'Lax'  # Allow cookies for same-site requests
-SESSION_COOKIE_SAMESITE = 'Lax'  # Allow cookies for same-site requests
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+CSRF_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_SAMESITE = 'Lax'
 
 # TODO: change to 518400 later
 SECURE_HSTS_SECONDS = 60

@@ -2,6 +2,7 @@ from django.utils import timezone
 from django.db.models import Q
 
 from core_apps.users.models import User
+from core_apps.users.utils import generate_presigned_url
 from core_apps.wallet.models import CustomerProfile, Wallet, WalletStatus
 
 
@@ -228,3 +229,239 @@ class CustomerOnboardingService:
             'needs_ratification': needs_ratification,
             'ratify_url': cls.RATIFY_URL if needs_ratification else None,
         }
+
+    @classmethod
+    def get_customer_detail(cls, user_pkid):
+        """
+        Get detailed customer information for the detail page.
+
+        Args:
+            user_pkid: The pkid of the user
+
+        Returns:
+            dict with comprehensive customer data or None if not found
+        """
+        try:
+            user = User.objects.select_related(
+                'customer_profile',
+            ).prefetch_related(
+                'customer_profile__wallets',
+                'documents'
+            ).get(pkid=user_pkid)
+        except User.DoesNotExist:
+            return None
+
+        customer_profile = getattr(user, 'customer_profile', None)
+        wallet = None
+
+        if customer_profile:
+            wallets = customer_profile.wallets.all()
+            wallet = wallets.first() if wallets else None
+
+        # Get all documents with their URLs
+        documents = {}
+        document_types = [
+            'NATIONAL_IDENTITY',
+            'BACK_OF_NATIONAL_IDENTITY',
+            'FACIAL_PHOTO',
+            'PASSPORT',
+            'BACK_OF_PASSPORT',
+            'DRIVERS_LICENSE',
+            'BACK_OF_DRIVERS_LICENSE',
+        ]
+
+        for doc in user.documents.all():
+            if doc.document_type in document_types:
+                documents[doc.document_type] = {
+                    'type': doc.document_type,
+                    'url': generate_presigned_url(doc.s3_key) if doc.s3_key else None,
+                    'document_number': doc.document_number,
+                    'uploaded': True,
+                }
+
+        # Add missing document placeholders
+        for doc_type in document_types:
+            if doc_type not in documents:
+                documents[doc_type] = {
+                    'type': doc_type,
+                    'url': None,
+                    'document_number': None,
+                    'uploaded': False,
+                }
+
+        # Check required docs
+        has_national_id = documents.get('NATIONAL_IDENTITY', {}).get('uploaded', False)
+        has_facial_photo = documents.get('FACIAL_PHOTO', {}).get('uploaded', False)
+        docs_uploaded = has_national_id and has_facial_photo
+
+        # Determine errors
+        has_kyc_error = customer_profile and customer_profile.kyc_status == 'FAILED'
+        has_wallet_error = wallet and wallet.status not in [WalletStatus.ACTIVE, WalletStatus.PENDING]
+
+        # Build timeline
+        timeline = cls._build_onboarding_timeline(user, customer_profile, wallet, docs_uploaded)
+
+        # Determine if user needs manual ratification
+        needs_ratification = (
+            customer_profile is not None and
+            customer_profile.customer_id is not None and
+            customer_profile.kyc_status == 'PENDING' and
+            wallet is None and
+            docs_uploaded and
+            user.email and
+            user.nation_id
+        )
+
+        return {
+            # User info
+            'user_pkid': user.pkid,
+            'user_id': str(user.id),
+            'mobile': f"{user.country_code}{user.mobile}" if user.country_code else user.mobile,
+            'email': user.email,
+            'first_name': user.first_name,
+            'middle_name': user.middle_name,
+            'last_name': user.last_name,
+            'full_name': f"{user.first_name or ''} {user.middle_name or ''} {user.last_name or ''}".strip() or user.mobile,
+            'nation_id': user.nation_id,
+            'dob': user.dob,
+            'gender': user.gender,
+            'city': user.city,
+            'country': str(user.country) if user.country else None,
+            'employment_status': user.employment_status,
+            'account_purpose': user.account_purpose,
+            'source_of_funds': user.source_of_funds,
+            'date_joined': user.date_joined,
+            'is_email_verified': user.is_email_verified,
+            'is_mobile_verified': user.is_mobile_verified,
+
+            # Customer profile info
+            'customer_id': customer_profile.customer_id if customer_profile else None,
+            'kyc_status': customer_profile.kyc_status if customer_profile else 'N/A',
+            'kyc_failure_stage': customer_profile.kyc_failure_stage if customer_profile else None,
+            'kyc_error_message': customer_profile.kyc_error_message if customer_profile else None,
+            'customer_created_at': customer_profile.created_at if customer_profile else None,
+
+            # Wallet info
+            'wallet_id': wallet.wallet_id if wallet else None,
+            'wallet_status': wallet.status if wallet else 'N/A',
+            'wallet_balance': float(wallet.available_balance) if wallet else None,
+            'wallet_account_number': wallet.account_number if wallet else None,
+            'wallet_friendly_id': wallet.friendly_id if wallet else None,
+            'wallet_created': wallet.created if wallet else None,
+            'wallet_currency': wallet.currency if wallet else 'KES',
+
+            # Documents
+            'documents': documents,
+            'docs_uploaded': docs_uploaded,
+
+            # Errors
+            'has_kyc_error': has_kyc_error,
+            'has_wallet_error': has_wallet_error,
+            'has_error': has_kyc_error or has_wallet_error,
+
+            # Timeline
+            'timeline': timeline,
+
+            # Actions
+            'needs_ratification': needs_ratification,
+            'ratify_url': cls.RATIFY_URL if needs_ratification else None,
+        }
+
+    @staticmethod
+    def _build_onboarding_timeline(user, customer_profile, wallet, docs_uploaded):
+        """Build the onboarding timeline steps."""
+        timeline = []
+
+        # Step 1: Account Created
+        timeline.append({
+            'step': 1,
+            'name': 'Account Created',
+            'description': 'User registered on the platform',
+            'status': 'completed',
+            'timestamp': user.date_joined,
+            'error': None,
+        })
+
+        # Step 2: Profile Completed
+        profile_complete = all([
+            user.first_name,
+            user.last_name,
+            user.dob,
+            user.nation_id,
+        ])
+        timeline.append({
+            'step': 2,
+            'name': 'Profile Completed',
+            'description': 'Personal details filled in',
+            'status': 'completed' if profile_complete else 'pending',
+            'timestamp': user.updated_on if profile_complete else None,
+            'error': None,
+        })
+
+        # Step 3: Documents Uploaded
+        timeline.append({
+            'step': 3,
+            'name': 'Documents Uploaded',
+            'description': 'National ID and selfie uploaded',
+            'status': 'completed' if docs_uploaded else 'pending',
+            'timestamp': None,  # No specific timestamp available
+            'error': None,
+        })
+
+        # Step 4: KYC Submitted
+        if customer_profile:
+            kyc_status = 'completed'
+            kyc_error = None
+            if customer_profile.kyc_status == 'PENDING':
+                kyc_status = 'in_progress'
+            elif customer_profile.kyc_status == 'FAILED':
+                kyc_status = 'failed'
+                kyc_error = customer_profile.kyc_error_message
+                if customer_profile.kyc_failure_stage:
+                    kyc_error = f"Stage: {customer_profile.kyc_failure_stage}. {kyc_error or ''}"
+
+            timeline.append({
+                'step': 4,
+                'name': 'KYC Verification',
+                'description': 'Identity verification process',
+                'status': kyc_status,
+                'timestamp': customer_profile.created_at,
+                'error': kyc_error,
+            })
+        else:
+            timeline.append({
+                'step': 4,
+                'name': 'KYC Verification',
+                'description': 'Identity verification process',
+                'status': 'pending',
+                'timestamp': None,
+                'error': None,
+            })
+
+        # Step 5: Wallet Created
+        if wallet:
+            wallet_status = 'completed' if wallet.status == WalletStatus.ACTIVE else 'in_progress'
+            wallet_error = None
+            if wallet.status not in [WalletStatus.ACTIVE, WalletStatus.PENDING]:
+                wallet_status = 'failed'
+                wallet_error = f"Wallet status: {wallet.status}"
+
+            timeline.append({
+                'step': 5,
+                'name': 'Wallet Activated',
+                'description': 'Digital wallet created and ready',
+                'status': wallet_status,
+                'timestamp': wallet.created,
+                'error': wallet_error,
+            })
+        else:
+            timeline.append({
+                'step': 5,
+                'name': 'Wallet Activated',
+                'description': 'Digital wallet created and ready',
+                'status': 'pending',
+                'timestamp': None,
+                'error': None,
+            })
+
+        return timeline

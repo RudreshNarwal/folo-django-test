@@ -5,6 +5,7 @@ from .views import (
     LogoutView,
     DashboardView,
     CustomerOnboardingAPIView,
+    CustomerDetailView,
 )
 
 app_name = 'dashboard'
@@ -17,6 +18,7 @@ urlpatterns = [
 
     # Dashboard
     path('', DashboardView.as_view(), name='index'),
+    path('customers/<int:user_pkid>/', CustomerDetailView.as_view(), name='customer_detail'),
 
     # API endpoints
     path('api/customers/', CustomerOnboardingAPIView.as_view(), name='api_customers'),

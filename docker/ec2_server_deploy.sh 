@@ -23,6 +23,8 @@ echo 'Building the image...'
 ssh -o StrictHostKeyChecking=no -i $PEM_FILE root@$EC2_IP_ADDRESS << 'ENDSSH'
   mkdir -p /app
   rm -rf /app/* && tar -xf /tmp/project.tar -C /app
+  # Make start scripts executable
+  chmod +x /app/docker/*/django/celery/*/start
   docker compose -f /app/production.yml up --build -d --remove-orphans
 ENDSSH
 echo 'Build completed successfully....:-)'

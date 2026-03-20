@@ -1,0 +1,77 @@
+{% extends 'dashboard/base.html' %}
+
+{% block title %}Verify OTP{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-blue-50 to-indigo-100">
+    <div class="max-w-md w-full space-y-8">
+        <div class="bg-white rounded-2xl shadow-xl p-8">
+            <div class="text-center mb-8">
+                <div class="mx-auto h-16 w-16 bg-folo-primary rounded-full flex items-center justify-center mb-4">
+                    <svg class="h-8 w-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                    </svg>
+                </div>
+                <h1 class="text-2xl font-bold text-gray-900">
+                    Verify OTP
+                </h1>
+                <p class="mt-2 text-sm text-gray-600">
+                    Enter the 6-digit code sent to <span class="font-medium text-folo-primary">{{ mobile }}</span>
+                </p>
+            </div>
+
+            {% if messages %}
+            <div class="space-y-2 mb-6">
+                {% for message in messages %}
+                <div class="p-4 rounded-lg {% if message.tags == 'error' %}bg-red-50 text-red-700 border border-red-200{% else %}bg-green-50 text-green-700 border border-green-200{% endif %}">
+                    <div class="flex items-center">
+                        {% if message.tags == 'error' %}
+                        <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        {% else %}
+                        <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        {% endif %}
+                        {{ message }}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <form method="post" class="space-y-6">
+                {% csrf_token %}
+                <div>
+                    <label for="id_otp" class="block text-sm font-medium text-gray-700 mb-2">
+                        OTP Code
+                    </label>
+                    {{ form.otp }}
+                    <p class="mt-2 text-xs text-gray-500">OTP expires in 5 minutes</p>
+                </div>
+
+                <button type="submit" class="w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-folo-primary hover:bg-folo-secondary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-folo-primary transition-all duration-200 shadow-lg hover:shadow-xl">
+                    <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    Verify & Login
+                </button>
+            </form>
+
+            <div class="mt-6 text-center">
+                <a href="{% url 'dashboard:login' %}" class="text-sm text-folo-primary hover:text-folo-secondary transition-colors">
+                    <svg class="h-4 w-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                    </svg>
+                    Back to login
+                </a>
+            </div>
+        </div>
+
+        <p class="text-center text-sm text-gray-500">
+            FoloMoney Admin Dashboard
+        </p>
+    </div>
+</div>
+{% endblock %}

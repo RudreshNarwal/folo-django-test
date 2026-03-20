@@ -1,0 +1,519 @@
+{% extends 'dashboard/base.html' %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50">
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+            <div class="flex items-center">
+                <div class="h-10 w-10 bg-gradient-to-br from-folo-primary to-folo-secondary rounded-xl flex items-center justify-center mr-3 shadow-md">
+                    <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-gray-900">Admin Dashboard</h1>
+                    <p class="text-xs text-gray-500">FoloMoney</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-4">
+                <div class="hidden sm:flex items-center px-3 py-2 bg-gray-50 rounded-lg">
+                    <div class="h-8 w-8 bg-folo-primary/10 rounded-full flex items-center justify-center mr-2">
+                        <svg class="h-4 w-4 text-folo-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                        </svg>
+                    </div>
+                    <span class="text-sm font-medium text-gray-700">{{ request.user.first_name|default:request.user.mobile }}</span>
+                </div>
+                <a href="{% url 'dashboard:logout' %}" class="inline-flex items-center px-4 py-2 border border-gray-200 text-sm font-medium rounded-lg text-gray-600 bg-white hover:bg-gray-50 hover:border-gray-300 transition-all duration-200">
+                    <svg class="h-4 w-4 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                    </svg>
+                    Logout
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Metrics Section -->
+        <section class="mb-8">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Overview</h2>
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                <!-- Total Users -->
+                <div class="group bg-white rounded-2xl shadow-sm border border-gray-100 p-5 hover:shadow-lg hover:border-gray-200 transition-all duration-300 cursor-help" title="Total number of registered users in the system">
+                    <div class="flex flex-col">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="h-10 w-10 bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                                <svg class="h-5 w-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                                </svg>
+                            </div>
+                            <div class="opacity-0 group-hover:opacity-100 transition-opacity">
+                                <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="text-2xl font-bold text-gray-900 mb-1">{{ metrics.total_users }}</div>
+                        <div class="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Users</div>
+                    </div>
+                </div>
+
+                <!-- Active Wallets -->
+                <div class="group bg-white rounded-2xl shadow-sm border border-gray-100 p-5 hover:shadow-lg hover:border-green-200 transition-all duration-300 cursor-help" title="Wallets with ACTIVE status - fully onboarded users who can transact">
+                    <div class="flex flex-col">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="h-10 w-10 bg-gradient-to-br from-green-100 to-green-200 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                                <svg class="h-5 w-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path>
+                                </svg>
+                            </div>
+                            <div class="opacity-0 group-hover:opacity-100 transition-opacity">
+                                <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="text-2xl font-bold text-green-600 mb-1">{{ metrics.active_wallets }}</div>
+                        <div class="text-xs font-medium text-gray-500 uppercase tracking-wide">Active Wallets</div>
+                    </div>
+                </div>
+
+                <!-- Pending KYC -->
+                <div class="group bg-white rounded-2xl shadow-sm border border-gray-100 p-5 hover:shadow-lg hover:border-amber-200 transition-all duration-300 cursor-help" title="Users awaiting KYC verification - may need manual ratification">
+                    <div class="flex flex-col">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="h-10 w-10 bg-gradient-to-br from-amber-100 to-amber-200 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                                <svg class="h-5 w-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                            </div>
+                            <div class="opacity-0 group-hover:opacity-100 transition-opacity">
+                                <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="text-2xl font-bold text-amber-600 mb-1">{{ metrics.pending_kyc }}</div>
+                        <div class="text-xs font-medium text-gray-500 uppercase tracking-wide">Pending KYC</div>
+                    </div>
+                </div>
+
+                <!-- Failed Wallets -->
+                <div class="group bg-white rounded-2xl shadow-sm border border-gray-100 p-5 hover:shadow-lg hover:border-red-200 transition-all duration-300 cursor-help" title="Wallets with error status (INACTIVE, SUSPENDED, CLOSED, LOCKED, CANCELED, BARRED) - requires attention">
+                    <div class="flex flex-col">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="h-10 w-10 bg-gradient-to-br from-red-100 to-red-200 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                                <svg class="h-5 w-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                </svg>
+                            </div>
+                            <div class="opacity-0 group-hover:opacity-100 transition-opacity">
+                                <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="text-2xl font-bold text-red-600 mb-1">{{ metrics.failed_wallets }}</div>
+                        <div class="text-xs font-medium text-gray-500 uppercase tracking-wide">Failed Wallets</div>
+                    </div>
+                </div>
+
+                <!-- Today's Registrations -->
+                <div class="group bg-white rounded-2xl shadow-sm border border-gray-100 p-5 hover:shadow-lg hover:border-blue-200 transition-all duration-300 cursor-help" title="New user registrations today (since midnight UTC)">
+                    <div class="flex flex-col">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="h-10 w-10 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                                <svg class="h-5 w-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path>
+                                </svg>
+                            </div>
+                            <div class="opacity-0 group-hover:opacity-100 transition-opacity">
+                                <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="text-2xl font-bold text-blue-600 mb-1">{{ metrics.todays_registrations }}</div>
+                        <div class="text-xs font-medium text-gray-500 uppercase tracking-wide">Today's Signups</div>
+                    </div>
+                </div>
+
+                <!-- Successful Onboardings -->
+                <div class="group bg-white rounded-2xl shadow-sm border border-gray-100 p-5 hover:shadow-lg hover:border-emerald-200 transition-all duration-300 cursor-help" title="Users with approved KYC and active wallet - fully onboarded and ready to use">
+                    <div class="flex flex-col">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="h-10 w-10 bg-gradient-to-br from-emerald-100 to-emerald-200 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                                <svg class="h-5 w-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                            </div>
+                            <div class="opacity-0 group-hover:opacity-100 transition-opacity">
+                                <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="text-2xl font-bold text-emerald-600 mb-1">{{ metrics.successful_onboardings }}</div>
+                        <div class="text-xs font-medium text-gray-500 uppercase tracking-wide">Onboarded</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Filters Section -->
+        <section class="mb-6">
+            <form method="get" class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-sm font-semibold text-gray-900">Filters</h3>
+                    {% if filters %}
+                    <span class="inline-flex items-center px-2 py-1 rounded-md bg-folo-primary/10 text-folo-primary text-xs font-medium">
+                        {{ filters|length }} active
+                    </span>
+                    {% endif %}
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+                    <!-- Search -->
+                    <div class="lg:col-span-2">
+                        <label class="block text-xs font-medium text-gray-600 mb-1.5">Search</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                </svg>
+                            </div>
+                            <input type="text" name="search" value="{{ filters.search|default:'' }}" placeholder="Mobile, ID, Name, Email..." class="block w-full h-10 pl-10 pr-3 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:bg-white focus:ring-2 focus:ring-folo-primary/20 focus:border-folo-primary transition-all duration-200 placeholder:text-gray-400">
+                        </div>
+                    </div>
+
+                    <!-- KYC Status (Multi-select) -->
+                    <div class="relative" x-data="{ open: false }" @click.away="open = false">
+                        <label class="block text-xs font-medium text-gray-600 mb-1.5">KYC Status</label>
+                        <button type="button" @click="open = !open" class="flex items-center justify-between w-full h-10 px-3 text-sm border border-gray-200 rounded-lg bg-gray-50 hover:bg-white focus:bg-white focus:ring-2 focus:ring-folo-primary/20 focus:border-folo-primary transition-all duration-200 text-left">
+                            <span class="truncate {% if not filters.kyc_status %}text-gray-400{% else %}text-gray-900{% endif %}">
+                                {% if filters.kyc_status %}
+                                    {{ filters.kyc_status|length }} selected
+                                {% else %}
+                                    All Statuses
+                                {% endif %}
+                            </span>
+                            <svg class="h-4 w-4 text-gray-500 flex-shrink-0 ml-2 transition-transform" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                        <div x-show="open" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="transition ease-in duration-75" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95" class="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg py-1 max-h-48 overflow-auto">
+                            {% for status in kyc_status_choices %}
+                            <label class="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                                <input type="checkbox" name="kyc_status" value="{{ status }}" {% if filters.kyc_status and status in filters.kyc_status %}checked{% endif %} class="w-4 h-4 rounded border-gray-300 text-folo-primary focus:ring-folo-primary/20 focus:ring-offset-0">
+                                <span class="ml-2 text-sm text-gray-700">{{ status }}</span>
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- Wallet Status (Multi-select) -->
+                    <div class="relative" x-data="{ open: false }" @click.away="open = false">
+                        <label class="block text-xs font-medium text-gray-600 mb-1.5">Wallet Status</label>
+                        <button type="button" @click="open = !open" class="flex items-center justify-between w-full h-10 px-3 text-sm border border-gray-200 rounded-lg bg-gray-50 hover:bg-white focus:bg-white focus:ring-2 focus:ring-folo-primary/20 focus:border-folo-primary transition-all duration-200 text-left">
+                            <span class="truncate {% if not filters.wallet_status %}text-gray-400{% else %}text-gray-900{% endif %}">
+                                {% if filters.wallet_status %}
+                                    {{ filters.wallet_status|length }} selected
+                                {% else %}
+                                    All Statuses
+                                {% endif %}
+                            </span>
+                            <svg class="h-4 w-4 text-gray-500 flex-shrink-0 ml-2 transition-transform" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                        <div x-show="open" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="transition ease-in duration-75" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95" class="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg py-1 max-h-48 overflow-auto">
+                            {% for status in wallet_status_choices %}
+                            <label class="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                                <input type="checkbox" name="wallet_status" value="{{ status }}" {% if filters.wallet_status and status in filters.wallet_status %}checked{% endif %} class="w-4 h-4 rounded border-gray-300 text-folo-primary focus:ring-folo-primary/20 focus:ring-offset-0">
+                                <span class="ml-2 text-sm text-gray-700">{{ status }}</span>
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- Date From -->
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1.5">From Date</label>
+                        <input type="date" name="date_from" value="{{ filters.date_from|default:'' }}" class="block w-full h-10 px-3 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:bg-white focus:ring-2 focus:ring-folo-primary/20 focus:border-folo-primary transition-all duration-200">
+                    </div>
+
+                    <!-- Date To -->
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1.5">To Date</label>
+                        <input type="date" name="date_to" value="{{ filters.date_to|default:'' }}" class="block w-full h-10 px-3 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:bg-white focus:ring-2 focus:ring-folo-primary/20 focus:border-folo-primary transition-all duration-200">
+                    </div>
+                </div>
+
+                <div class="mt-4 flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-gray-100">
+                    <label class="inline-flex items-center cursor-pointer group">
+                        <input type="checkbox" name="has_error" value="true" {% if filters.has_error %}checked{% endif %} class="w-4 h-4 rounded border-gray-300 text-folo-primary focus:ring-folo-primary/20 focus:ring-offset-0">
+                        <span class="ml-2 text-sm text-gray-600 group-hover:text-gray-900 transition-colors">Show only with errors</span>
+                    </label>
+
+                    <div class="flex items-center gap-3">
+                        <a href="{% url 'dashboard:index' %}" class="inline-flex items-center px-4 h-10 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
+                            Clear all
+                        </a>
+                        <button type="submit" class="inline-flex items-center px-5 h-10 bg-folo-primary text-white text-sm font-medium rounded-lg hover:bg-folo-secondary focus:outline-none focus:ring-2 focus:ring-folo-primary/20 focus:ring-offset-2 transition-all duration-200 shadow-sm hover:shadow-md">
+                            <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
+                            </svg>
+                            Apply Filters
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </section>
+
+        <!-- Customer Table Section -->
+        <section>
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-semibold text-gray-900">Customer Onboarding</h2>
+                <div class="flex items-center gap-2">
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-lg bg-gray-100 text-xs font-medium text-gray-600">
+                        {{ page_obj.paginator.count }} records
+                    </span>
+                </div>
+            </div>
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="overflow-x-auto scrollbar-thin">
+                    <table class="w-full min-w-[1400px]">
+                        <thead>
+                            <tr class="bg-gray-50/80 border-b border-gray-100">
+                                <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">PKID</th>
+                                <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Customer ID</th>
+                                <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Wallet ID</th>
+                                <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Mobile</th>
+                                <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Name</th>
+                                <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Balance</th>
+                                <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Docs</th>
+                                <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">KYC Status</th>
+                                <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Wallet Status</th>
+                                <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Registered</th>
+                                <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-50">
+                            {% for customer in customers %}
+                            <tr class="{% if customer.has_error %}bg-red-50/50 hover:bg-red-50{% elif customer.is_recent %}bg-blue-50/50 hover:bg-blue-50{% else %}hover:bg-gray-50/50{% endif %} transition-colors duration-150">
+                                <td class="px-4 py-3.5 whitespace-nowrap">
+                                    <a href="{% url 'dashboard:customer_detail' customer.user_pkid %}" class="text-sm font-medium text-folo-primary hover:text-folo-secondary hover:underline transition-colors">
+                                        {{ customer.user_pkid }}
+                                    </a>
+                                </td>
+                                <td class="px-4 py-3.5 whitespace-nowrap text-sm font-medium">
+                                    {% if customer.customer_id %}
+                                    <a href="{% url 'dashboard:customer_detail' customer.user_pkid %}" class="text-folo-primary hover:text-folo-secondary hover:underline transition-colors">
+                                        {{ customer.customer_id }}
+                                    </a>
+                                    {% else %}
+                                    <span class="text-gray-400">—</span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-4 py-3.5 whitespace-nowrap text-sm text-gray-900 font-medium">
+                                    {{ customer.wallet_id|default:'—' }}
+                                </td>
+                                <td class="px-4 py-3.5 whitespace-nowrap text-sm text-gray-900 font-medium">
+                                    {{ customer.mobile }}
+                                </td>
+                                <td class="px-4 py-3.5 whitespace-nowrap text-sm max-w-[150px] truncate" title="{{ customer.name }}">
+                                    <a href="{% url 'dashboard:customer_detail' customer.user_pkid %}" class="text-gray-700 hover:text-folo-primary hover:underline transition-colors">
+                                        {{ customer.name }}
+                                    </a>
+                                </td>
+                                <td class="px-4 py-3.5 whitespace-nowrap text-sm">
+                                    {% if customer.wallet_balance is not None %}
+                                    <span class="font-medium {% if customer.wallet_balance > 0 %}text-green-600{% else %}text-gray-600{% endif %}">
+                                        KES {{ customer.wallet_balance|floatformat:2 }}
+                                    </span>
+                                    {% else %}
+                                    <span class="text-gray-400">—</span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-4 py-3.5 whitespace-nowrap">
+                                    {% if customer.docs_uploaded %}
+                                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-green-100 text-green-700">
+                                        <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                        </svg>
+                                        Done
+                                    </span>
+                                    {% else %}
+                                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-600">
+                                        Pending
+                                    </span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-4 py-3.5 whitespace-nowrap">
+                                    <div class="flex items-center gap-1">
+                                        <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium
+                                            {% if customer.kyc_status == 'APPROVED' %}bg-green-100 text-green-700
+                                            {% elif customer.kyc_status == 'PENDING' %}bg-amber-100 text-amber-700
+                                            {% elif customer.kyc_status == 'FAILED' %}bg-red-100 text-red-700
+                                            {% else %}bg-gray-100 text-gray-600{% endif %}">
+                                            {{ customer.kyc_status }}
+                                        </span>
+                                        {% if customer.kyc_error_message %}
+                                        <span class="tooltip">
+                                            <svg class="w-4 h-4 text-red-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                            </svg>
+                                            <span class="tooltip-text">
+                                                {% if customer.kyc_failure_stage %}<strong>Stage:</strong> {{ customer.kyc_failure_stage }}<br>{% endif %}
+                                                <strong>Error:</strong> {{ customer.kyc_error_message }}
+                                            </span>
+                                        </span>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td class="px-4 py-3.5 whitespace-nowrap">
+                                    <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium
+                                        {% if customer.wallet_status == 'ACTIVE' %}bg-green-100 text-green-700
+                                        {% elif customer.wallet_status == 'PENDING' %}bg-amber-100 text-amber-700
+                                        {% elif customer.wallet_status == 'N/A' %}bg-gray-100 text-gray-600
+                                        {% else %}bg-red-100 text-red-700{% endif %}">
+                                        {{ customer.wallet_status }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3.5 whitespace-nowrap">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-sm text-gray-600">{{ customer.date_joined|date:"M d, Y" }}</span>
+                                        {% if customer.is_recent %}
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-700">NEW</span>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td class="px-4 py-3.5 whitespace-nowrap">
+                                    {% if customer.needs_ratification %}
+                                    <a href="{{ customer.ratify_url }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 px-3 py-1.5 bg-amber-500 text-white text-xs font-semibold rounded-lg hover:bg-amber-600 transition-colors shadow-sm">
+                                        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                                        </svg>
+                                        Ratify
+                                    </a>
+                                    {% else %}
+                                    <span class="text-gray-300">—</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="11" class="px-6 py-16 text-center">
+                                    <div class="flex flex-col items-center">
+                                        <div class="h-16 w-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                                            <svg class="h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
+                                            </svg>
+                                        </div>
+                                        <p class="text-gray-500 font-medium mb-1">No customers found</p>
+                                        <p class="text-gray-400 text-sm mb-4">Try adjusting your filters</p>
+                                        <a href="{% url 'dashboard:index' %}" class="inline-flex items-center px-4 py-2 text-sm font-medium text-folo-primary hover:text-folo-secondary transition-colors">
+                                            <svg class="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                            </svg>
+                                            Reset filters
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                {% if page_obj.paginator.num_pages > 1 %}
+                <div class="bg-gray-50/50 px-6 py-4 border-t border-gray-100">
+                    <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+                        <p class="text-sm text-gray-600">
+                            Showing <span class="font-semibold text-gray-900">{{ page_obj.start_index }}</span> to <span class="font-semibold text-gray-900">{{ page_obj.end_index }}</span> of <span class="font-semibold text-gray-900">{{ page_obj.paginator.count }}</span>
+                        </p>
+                        <div class="flex items-center gap-1">
+                            <!-- First Page -->
+                            {% if page_obj.number > 2 %}
+                            <a href="?page=1{% if filter_query_string %}&{{ filter_query_string }}{% endif %}" class="inline-flex items-center justify-center w-9 h-9 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all" title="First page">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"></path>
+                                </svg>
+                            </a>
+                            {% endif %}
+
+                            <!-- Previous Page -->
+                            {% if page_obj.has_previous %}
+                            <a href="?page={{ page_obj.previous_page_number }}{% if filter_query_string %}&{{ filter_query_string }}{% endif %}" class="inline-flex items-center justify-center w-9 h-9 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all" title="Previous page">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                                </svg>
+                            </a>
+                            {% endif %}
+
+                            <!-- Page Numbers -->
+                            {% for num in page_obj.paginator.page_range %}
+                                {% if num == page_obj.number %}
+                                <span class="inline-flex items-center justify-center w-9 h-9 text-sm font-semibold text-white bg-folo-primary border border-folo-primary rounded-lg">{{ num }}</span>
+                                {% elif num == page_obj.number|add:"-1" or num == page_obj.number|add:"1" or num == 1 or num == page_obj.paginator.num_pages %}
+                                <a href="?page={{ num }}{% if filter_query_string %}&{{ filter_query_string }}{% endif %}" class="inline-flex items-center justify-center w-9 h-9 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all">{{ num }}</a>
+                                {% elif num == page_obj.number|add:"-2" or num == page_obj.number|add:"2" %}
+                                <span class="inline-flex items-center justify-center w-6 h-9 text-gray-400">...</span>
+                                {% endif %}
+                            {% endfor %}
+
+                            <!-- Next Page -->
+                            {% if page_obj.has_next %}
+                            <a href="?page={{ page_obj.next_page_number }}{% if filter_query_string %}&{{ filter_query_string }}{% endif %}" class="inline-flex items-center justify-center w-9 h-9 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all" title="Next page">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                </svg>
+                            </a>
+                            {% endif %}
+
+                            <!-- Last Page -->
+                            {% if page_obj.number < page_obj.paginator.num_pages|add:"-1" %}
+                            <a href="?page={{ page_obj.paginator.num_pages }}{% if filter_query_string %}&{{ filter_query_string }}{% endif %}" class="inline-flex items-center justify-center w-9 h-9 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all" title="Last page">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"></path>
+                                </svg>
+                            </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <p class="text-center text-sm text-gray-400">FoloMoney Admin Dashboard</p>
+    </footer>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Custom scrollbar for table */
+    .scrollbar-thin::-webkit-scrollbar {
+        height: 8px;
+    }
+    .scrollbar-thin::-webkit-scrollbar-track {
+        background: #f1f5f9;
+        border-radius: 4px;
+    }
+    .scrollbar-thin::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+    }
+    .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+    }
+</style>
+{% endblock %}

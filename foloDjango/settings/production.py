@@ -51,6 +51,9 @@ LOCAL_APPS = [
 	"core_apps.users",
 	"core_apps.transunion",
 	"core_apps.payments",
+	"core_apps.wallet",
+	"core_apps.international_wallet",
+	"core_apps.dashboard",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -256,7 +259,7 @@ LOGGING = {
 # TODO add domain names of the production server
 CSRF_TRUSTED_ORIGINS = ["https://folo.money"]
 SECRET_KEY = env("DJANGO_SECRET_KEY")
-ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["folo.money"]) + ["localhost", "0.0.0.0", "127.0.0.1"]
+ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["folo.money"]) + ["api.astraafrica.co", "api.africastalking.com", "localhost", "0.0.0.0", "127.0.0.1"]
 CORS_ALLOW_ALL_ORIGINS = True  # set false for prod TODO
 CORS_ALLOW_CREDENTIALS = True  # set false for prod TODO
 ADMIN_URL = env("DJANGO_ADMIN_URL")
@@ -280,8 +283,9 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 DEFAULT_FROM_EMAIL = env(
 	"DJANGO_DEFAULT_FROM_EMAIL",
-	default="FoloMoney Support <rudresh@ubuntuonline.co.ke>",
+	default="FoloMoney Production <rudresh@ubuntuonline.co.ke>",
 )
+DEFAULT_EMAIL_RECEIVERS = ["rudresh@ubuntuonline.co.ke", "kevin@ubuntuonline.co.ke", "rudresh.narwal20@gmail.com"]
 
 SITE_NAME = "FoloMoney"
 
@@ -292,13 +296,16 @@ EMAIL_SUBJECT_PREFIX = env(
 
 # settings.py
 
-EMAIL_BACKEND = 'django_ses.SESBackend'
+EMAIL_BACKEND = "djcelery_email.backends.CeleryEmailBackend"
+CELERY_EMAIL_BACKEND = "django_ses.SESBackend"
+
 ADMINS = [("Kevin", "kevin@ubuntuonline.co.ke"), ("Rudresh", "rudresh@ubuntuonline.co.ke"),
           ]
 AWS_ACCESS_KEY_ID = env("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = env("AWS_SECRET_ACCESS_KEY")
 AWS_SES_REGION_NAME = 'af-south-1'
 AWS_SES_REGION_ENDPOINT = 'email.af-south-1.amazonaws.com'
+AWS_SES_AUTO_THROTTLE = 0.5  # Throttle sending rate for production
 EMAIL_USE_TLS = True
 DOMAIN = env("DOMAIN")
 
@@ -314,3 +321,37 @@ MPESA_ENDPOINT = env("MPESA_ENDPOINT")
 MPESA_PASSKEY = env("MPESA_PASSKEY")
 MPESA_CLIENT_TOKEN = env("MPESA_CLIENT_TOKEN")
 MPESA_BUSINESS_CODE = env("MPESA_BUSINESS_CODE")
+
+AWS_STORAGE_BUCKET_NAME=env("AWS_STORAGE_BUCKET_NAME")
+AWS_S3_REGION_NAME=env("AWS_S3_REGION_NAME")
+
+OPENAI_API_KEY = env("OPENAI_API_KEY")
+
+ADD_MONEY_WEBHOOK_URL = env("ADD_MONEY_WEBHOOK_URL")
+BANK_TRANSFER_CALLBACK_URL = env("BANK_TRANSFER_CALLBACK_URL")
+WALLET_WITHDRAWAL_CALLBACK_URL = env("WALLET_WITHDRAWAL_CALLBACK_URL")
+WALLET_MOVEMENT_CALLBACK_URL = env("WALLET_MOVEMENT_CALLBACK_URL")
+REQUESTS_VERIFY_SSL = True
+
+AFRICA_TALKING_BASE_URL = env("AFRICA_TALKING_BASE_URL")
+AFRICA_TALKING_API_KEY = env("AFRICA_TALKING_API_KEY")
+
+BRIDGE_API_KEY = env("BRIDGE_API_KEY")
+BRIDGE_BASE_URL = env("BRIDGE_BASE_URL")
+
+TWILIO_SID = env("TWILIO_SID")
+TWILIO_AUTH_TOKEN = env("TWILIO_AUTH_TOKEN")
+TWILIO_PHONE_NUMBER = env("TWILIO_PHONE_NUMBER")
+
+FERNET_KEY = env("FERNET_KEY")
+
+# Celery Beat Configuration
+CELERY_BEAT_SCHEDULE = {
+    'cleanup-expired-transactions': {
+        'task': 'core_apps.wallet.tasks.cleanup_expired_transactions',
+        'schedule': 3600.0,  # Run every hour (3600 seconds)
+    },
+}
+CELERY_TIMEZONE = 'UTC'
+
+WEBHOOK_PUBLIC_KEY = env("WEBHOOK_PUBLIC_KEY")

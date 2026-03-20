@@ -10,13 +10,13 @@ ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 APP_DIR = ROOT_DIR / 'core_apps'
 
 # Define the path to the .env file
-env_file = ROOT_DIR / '.envs/.production/.django'
+env_file = ROOT_DIR / '.envs/.dev/.django'
 
 # Check if the .env file exists and then read it
 if env_file.is_file():
 	environ.Env.read_env(str(env_file))
 
-DEBUG = env.bool('DJANGO_DEBUG', False)
+DEBUG = True  # Set to True for local development to see detailed errors
 
 ROOT_URLCONF = "foloDjango.urls"
 
@@ -40,6 +40,7 @@ THIRD_PARTY_APPS = [
 	"djcelery_email",
 	'rest_framework_simplejwt',
 	"rest_framework.authtoken",
+	"django_ses"
 ]
 
 LOCAL_APPS = [
@@ -47,6 +48,9 @@ LOCAL_APPS = [
 	"core_apps.users",
 	"core_apps.transunion",
 	"core_apps.payments",
+	"core_apps.wallet",
+	"core_apps.international_wallet",
+	"core_apps.dashboard",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -226,17 +230,25 @@ LOGGING = {
 ADMINS = [("Rudresh Narwal", "rudresh@ubuntuonline.co.ke")]
 
 # TODO add domain names of the production server
-CSRF_TRUSTED_ORIGINS = ["https://folo.money"]
+CSRF_TRUSTED_ORIGINS = [
+    "https://folo.money",
+    "https://dev-api.folo.money",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+]
 SECRET_KEY = env("DJANGO_SECRET_KEY")
-ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["folo.money"]) + ["localhost", "0.0.0.0", "127.0.0.1"]
+ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["folo.money"]) + ["localhost", "0.0.0.0",
+                                                                            "127.0.0.1", "api.astraafrica.co", "api.africastalking.com"]  # for local ALLOWED_HOSTS = ["localhost", "0.0.0.0", "127.0.0.1"]
 CORS_ALLOW_ALL_ORIGINS = True  # set false for prod TODO
 CORS_ALLOW_CREDENTIALS = True  # set false for prod TODO
 ADMIN_URL = env("DJANGO_ADMIN_URL")
 DATABASES = {"default": env.db("DATABASE_URL")}
-SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-SECURE_SSL_REDIRECT = env.bool("DJANGO_SECURE_SSL_REDIRECT", default=True)
+# SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")  # comment this to run in local
+# SECURE_SSL_REDIRECT = env.bool("DJANGO_SECURE_SSL_REDIRECT", default=True)  # comment this to run in local
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
+CSRF_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_SAMESITE = 'Lax'
 
 # TODO: change to 518400 later
 SECURE_HSTS_SECONDS = 60
@@ -252,8 +264,9 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 DEFAULT_FROM_EMAIL = env(
 	"DJANGO_DEFAULT_FROM_EMAIL",
-	default="FoloMoney Support <rudresh@ubuntuonline.co.ke>",
+	default="FoloMoney Dev <rudresh@ubuntuonline.co.ke>",
 )
+DEFAULT_EMAIL_RECEIVERS = ["rudresh@ubuntuonline.co.ke", "kevin@ubuntuonline.co.ke", "rudresh.narwal20@gmail.com"]
 
 SITE_NAME = "FoloMoney"
 
@@ -263,10 +276,11 @@ EMAIL_SUBJECT_PREFIX = env(
 	"DJANGO_EMAIL_SUBJECT_PREFIX",
 	default="[FoloMoney]",
 )
-
 EMAIL_BACKEND = 'django_ses.SESBackend'
 AWS_ACCESS_KEY_ID = env("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = env("AWS_SECRET_ACCESS_KEY")
+AWS_SES_REGION_NAME = 'af-south-1'
+AWS_SES_REGION_ENDPOINT = 'email.af-south-1.amazonaws.com'
 EMAIL_USE_TLS = True
 DOMAIN = env("DOMAIN")
 
@@ -282,3 +296,37 @@ MPESA_ENDPOINT = env("MPESA_ENDPOINT")
 MPESA_PASSKEY = env("MPESA_PASSKEY")
 MPESA_CLIENT_TOKEN = env("MPESA_CLIENT_TOKEN")
 MPESA_BUSINESS_CODE = env("MPESA_BUSINESS_CODE")
+
+AWS_STORAGE_BUCKET_NAME = env("AWS_STORAGE_BUCKET_NAME")
+AWS_S3_REGION_NAME = env("AWS_S3_REGION_NAME")
+
+OPENAI_API_KEY = env("OPENAI_API_KEY")
+
+ADD_MONEY_WEBHOOK_URL = env("ADD_MONEY_WEBHOOK_URL")
+BANK_TRANSFER_CALLBACK_URL = env("BANK_TRANSFER_CALLBACK_URL")
+WALLET_WITHDRAWAL_CALLBACK_URL = env("WALLET_WITHDRAWAL_CALLBACK_URL")
+WALLET_MOVEMENT_CALLBACK_URL = env("WALLET_MOVEMENT_CALLBACK_URL")
+REQUESTS_VERIFY_SSL = True
+
+AFRICA_TALKING_BASE_URL = env("AFRICA_TALKING_BASE_URL")
+AFRICA_TALKING_API_KEY = env("AFRICA_TALKING_API_KEY")
+
+BRIDGE_API_KEY = env("BRIDGE_API_KEY")
+BRIDGE_BASE_URL = env("BRIDGE_BASE_URL")
+
+TWILIO_SID = env("TWILIO_SID")
+TWILIO_AUTH_TOKEN = env("TWILIO_AUTH_TOKEN")
+TWILIO_PHONE_NUMBER = env("TWILIO_PHONE_NUMBER")
+
+FERNET_KEY = env("FERNET_KEY")
+
+# Celery Beat Configuration
+CELERY_BEAT_SCHEDULE = {
+    'cleanup-expired-transactions': {
+        'task': 'core_apps.wallet.tasks.cleanup_expired_transactions',
+        'schedule': 3600.0,  # Run every hour (3600 seconds)
+    },
+}
+CELERY_TIMEZONE = 'UTC'
+
+WEBHOOK_PUBLIC_KEY = env("WEBHOOK_PUBLIC_KEY")

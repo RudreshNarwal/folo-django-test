@@ -45,6 +45,7 @@ THIRD_PARTY_APPS = [
 	"djcelery_email",
 	'rest_framework_simplejwt',
 	"rest_framework.authtoken",
+	"django_ses",
 ]
 
 LOCAL_APPS = [
@@ -52,6 +53,8 @@ LOCAL_APPS = [
 	"core_apps.users",
 	"core_apps.transunion",
 	"core_apps.payments",
+	"core_apps.wallet",
+	"core_apps.international_wallet",
 	# "core_apps.articles",
 	# "core_apps.ratings",
 	# "core_apps.bookmarks",
@@ -232,11 +235,25 @@ CORS_ALLOW_CREDENTIALS = True
 # CORS_ALLOWED_ORIGINS = ['http://localhost:8080', "https://dev-api.folo.money"]
 # CSRF_TRUSTED_ORIGINS = ['http://localhost:8080', "https://dev-api.folo.money"]
 
+AWS_ACCESS_KEY_ID = env("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = env("AWS_SECRET_ACCESS_KEY")
+AWS_SES_REGION_NAME = "af-south-1"  # Cape Town, Africa region
+AWS_SES_REGION_ENDPOINT = "email.af-south-1.amazonaws.com"
 
+# Configure SES as the email backend for better performance and HTML support
 EMAIL_BACKEND = "djcelery_email.backends.CeleryEmailBackend"
-EMAIL_HOST = env("EMAIL_HOST", default="mailhog")
-EMAIL_PORT = env("EMAIL_PORT")
-DEFAULT_FROM_EMAIL = "rudresh@ubuntuonline.co.ke"
+CELERY_EMAIL_BACKEND = "django_ses.SESBackend"
+
+# SES Configuration
+AWS_SES_AUTO_THROTTLE = 0.5  # Throttle sending rate
+AWS_SES_CONFIGURATION_SET = None  # Optional: set if you have a configuration set
+
+# Remove the old EMAIL_HOST settings as we're using SES
+# EMAIL_HOST = env("EMAIL_HOST", default="mailhog")
+# EMAIL_PORT = env("EMAIL_PORT")
+
+DEFAULT_FROM_EMAIL = "FoloMoney <noreply@folomoney.com>"  # Use a verified SES email
+DEFAULT_EMAIL_RECEIVERS = ["rudresh@ubuntuonline.co.ke", "kevin@ubuntuonline.co.ke", "rudresh.narwal20@gmail.com"]
 DOMAIN = env("DOMAIN")
 SITE_NAME = "FoloMoney"
 
@@ -245,6 +262,7 @@ BASE_URL=env("BASE_URL")
 TRANSUNION_ENDPOINT=env("TRANSUNION_ENDPOINT")
 TRANSUNION_USERNAME=env("TRANSUNION_USERNAME")
 TRANSUNION_PASSWORD=env("TRANSUNION_PASSWORD")
+TRANSUNION_PASSWORD=env("TRANSUNION_PASSWORD")
 TRANSUNION_CODE=env("TRANSUNION_CODE")
 TRANSUNION_INFINITY_CODE=env("TRANSUNION_INFINITY_CODE")
 
@@ -252,3 +270,29 @@ MPESA_ENDPOINT=env("MPESA_ENDPOINT")
 MPESA_PASSKEY=env("MPESA_PASSKEY")
 MPESA_CLIENT_TOKEN=env("MPESA_CLIENT_TOKEN")
 MPESA_BUSINESS_CODE=env("MPESA_BUSINESS_CODE")
+
+AWS_STORAGE_BUCKET_NAME=env("AWS_STORAGE_BUCKET_NAME")
+AWS_S3_REGION_NAME=env("AWS_S3_REGION_NAME")
+
+# Add to your environment variables and settings
+OPENAI_API_KEY = env("OPENAI_API_KEY")
+
+ADD_MONEY_WEBHOOK_URL = env("ADD_MONEY_WEBHOOK_URL")
+BANK_TRANSFER_CALLBACK_URL = env("BANK_TRANSFER_CALLBACK_URL")
+WALLET_WITHDRAWAL_CALLBACK_URL = env("WALLET_WITHDRAWAL_CALLBACK_URL")
+WALLET_MOVEMENT_CALLBACK_URL = env("WALLET_MOVEMENT_CALLBACK_URL")
+REQUESTS_VERIFY_SSL = True
+
+AFRICA_TALKING_BASE_URL = env("AFRICA_TALKING_BASE_URL")
+AFRICA_TALKING_API_KEY = env("AFRICA_TALKING_API_KEY")
+
+BRIDGE_API_KEY = env("BRIDGE_API_KEY")
+BRIDGE_BASE_URL = env("BRIDGE_BASE_URL")
+
+TWILIO_SID = env("TWILIO_SID")
+TWILIO_AUTH_TOKEN = env("TWILIO_AUTH_TOKEN")
+TWILIO_PHONE_NUMBER = env("TWILIO_PHONE_NUMBER")
+
+FERNET_KEY = env("FERNET_KEY")
+
+WEBHOOK_PUBLIC_KEY = env("WEBHOOK_PUBLIC_KEY")

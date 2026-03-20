@@ -37,6 +37,7 @@ class GenericModel(models.Model):
     class Meta:
         abstract = True
 
+
 class GenericModelWithoutActive(models.Model):
     created_on = models.DateTimeField(
         auto_now_add=True

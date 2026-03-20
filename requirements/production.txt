@@ -4,4 +4,5 @@ gunicorn==21.2.0
 psycopg2-binary==2.9.9
 whitenoise==6.6.0
 django-ses==3.5.2
-boto3
+twilio==9.6.2
+cryptography==45.0.4

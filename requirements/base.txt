@@ -20,3 +20,11 @@ djangorestframework-simplejwt==5.2.2 # Simple JWT is a JSON web token authentica
 dj-rest-auth==3.0.0 # is a set of rest API endpoints to handle user registration and authentication tasks
 django-elasticsearch-dsl==7.3.0
 django-elasticsearch-dsl-drf==0.22.5
+boto3
+django-celery-beat
+django_celery_results
+openai
+pydantic
+twilio==9.6.2
+cryptography==45.0.4
+setuptools==80.9.0

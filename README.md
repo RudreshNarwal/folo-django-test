@@ -1,4 +1,4 @@
-# FOLO Money django application 
+"# FOLO Money django application 
 
 set up project environment in .env file at root 
 Ex: **DJANGO_ENV=qa/dev/production/local**

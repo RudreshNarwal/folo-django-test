@@ -10,13 +10,15 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from core_apps.users.models.user import User
-from core_apps.users.serializers.user import RegisterUserMobileSerializer
+from core_apps.users.serializers.auth import RegisterUserMobileSerializer
 from core_apps.users.serializers.auth import VerifyOTPRequestSerializer
 from django.contrib.auth import get_user_model
 from rest_framework.generics import RetrieveUpdateAPIView
 from rest_framework.permissions import IsAuthenticated
+from ..utils import get_country_from_country_code
 
 from ..serializers.user import UserSerializer
+
 
 class AuthView(viewsets.ViewSet):
     model = User
@@ -28,34 +30,37 @@ class AuthView(viewsets.ViewSet):
 
     @action(methods=['POST'], detail=False)
     def send_otp(self, request):
- 
         serializer = RegisterUserMobileSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        
+
         mobile = serializer.validated_data.get('mobile')
         country_code = serializer.validated_data.get('country_code')
-        
-        # Now, you can use the mobile and country_code variables to look up the user
-        user = self.model.objects.filter(mobile=mobile, country_code=country_code).first()
 
-        if user is not None:
+        user = self.model.objects.filter(mobile=mobile).first()
+
+        if user:
+            # If user exists, update country code and country if necessary
+            if user.country_code != country_code:
+                user.country_code = country_code
+                user.country = get_country_from_country_code(country_code)
+                user.save(update_fields=['country_code', 'country'])
+
             otp = user.send_otp()
             return Response({
-                "is_registered": user.email is not None,
+                "is_registered": user.email is not None and user.email.strip() != "",
                 "message": "Otp sent successfully !!"
             }, status=status.HTTP_200_OK)
-
-        if user is None:
-            serializer = RegisterUserMobileSerializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
+        else:
+            # If user does not exist, create a new one and send OTP
             user = serializer.save()
+            user.country_code = country_code
+            user.country = get_country_from_country_code(country_code)
+            user.save(update_fields=['country_code', 'country'])
             otp = user.send_otp()
             return Response({
-                "is_registered": user.email is not None,
+                "is_registered": user.email is not None and user.email.strip() != "",
                 "message": "Otp sent successfully !!"
             }, status=status.HTTP_201_CREATED)
-
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     @action(methods=['POST'], detail=False)
     def verify_otp(self, request):

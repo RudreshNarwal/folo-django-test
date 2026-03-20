@@ -51,6 +51,23 @@ services:
         networks:
             - folo-api
 
+    celery_beat:
+        build:
+            context: .
+            dockerfile: ./docker/local/django/Dockerfile
+        command: /start-celerybeat
+        container_name: celery_beat
+        volumes:
+            - .:/app
+            - celery_beat_data:/data
+        env_file:
+            - ./.envs/.local/.django
+        depends_on:
+            - redis
+            - mailhog
+        networks:
+            - folo-api
+
     flower: # Flower is an open-source web application for monitoring and managing Celery clusters.
         build:
             context: .
@@ -90,3 +107,4 @@ volumes:
     static_volume:
     media_volume:
     flower_data:
+    celery_beat_data:
